@@ -1,0 +1,23 @@
+// Commented line
+
+p "hello world"
+div.say_hi "hi"
+
+
+// This text gets inside the last element
+
+p#whitespace_sensitivity_test
+"i'm inside the last p because mustard is whitespace ignorant"
+
+br;   // the correct way to write an empty tag
+"i'm a new text line"
+
+br {} // also good
+"i'm also a new text line"
+
+a.link#main_link.large@href="#"@target="_blank" 
+
+ul.example.list#exampleList {
+    li.first "first list item"
+    li.second "first list item"
+}
