@@ -23,7 +23,7 @@ elementDeclaration "element declaration"
 attributeDeclaration "attributes declaration"
     = '#' ident:ident _                   { return {id: ident}; }
     / '.' ident:ident _                 { return {class: ident}; }
-    / '@' ident:ident _ '=' _ value:string _  { var o={}; o[ident]=value; return o;  }
+    / '@' ident:ident _ '=' _ value:stringLiteral _  { var o={}; o[ident]=value; return o;  }
 
 
 elementContents "element contents"
@@ -35,7 +35,7 @@ elementContents "element contents"
 
 
 textElement "text"
-    = it:interpolatedString { return it; }
+    = it:stringLiteral { return it; }
 
 //    = contentString:string { 
 //        return contentString; 
@@ -43,16 +43,16 @@ textElement "text"
 //    / interpolated:interpolatedField { return interpolated; }
      
 
-interpolatedField "interpolated field"
-  = '{{' _ id:ident _ '}}' { return "{{" + id + "}}"; }
+stringLiteral
+ = '"' '"' _ { return ""; }
+ / '"' st:stringInternal+ '"' _ { return st }
 
-interpolatedString
-    = '"' '"' _ { return "" }
-    / '"' str:stringInternal+ '"' _ { return str; }
 
 stringInternal
-    = '{{' _ id:ident _ '}}' { return "{{" + id + "}}"; } 
-    / chars:chars { return chars; }
+ = '{{' id:ident '}}' { return {interpolate: id} }
+    / chr:[^"{]+ { return chr.join('') }
+    / chr:'{' { return chr }
+
 
 
 
@@ -61,47 +61,9 @@ stringInternal
 ident "identifier"
   = chars:identChar+ { return chars.join("");  } 
 
-string "string"
-  = '"' '"' _             { return "";    }
-  / '"' chars:chars '"' _ { return chars; }
-
-chars
-  = chars:char+ { return chars.join(""); }
-
-char
-  // In the original JSON grammar: "any-Unicode-character-except-"-or-\-or-control-character"
-  = [^"\\\0-\x1F\x7f]
-  / '\\"'  { return '"';  }
-  / "\\\\" { return "\\"; }
-  / "\\/"  { return "/";  }
-  / "\\b"  { return "\b"; }
-  / "\\f"  { return "\f"; }
-  / "\\n"  { return "\n"; }
-  / "\\r"  { return "\r"; }
-  / "\\t"  { return "\t"; }
-  / "\\u" h1:hexDigit h2:hexDigit h3:hexDigit h4:hexDigit {
-      return String.fromCharCode(parseInt("0x" + h1 + h2 + h3 + h4));
-    }
-
 identChar
   = [a-zA-Z\-_]
 
-
-/*
- * The following rules are not present in the original JSON gramar, but they are
- * assumed to exist implicitly.
- *
- * FIXME: Define them according to ECMA-262, 5th ed.
- */
-
-digit
-  = [0-9]
-
-digit19
-  = [1-9]
-
-hexDigit
-  = [0-9a-fA-F]
 
 /* ===== Whitespace ===== */
 
