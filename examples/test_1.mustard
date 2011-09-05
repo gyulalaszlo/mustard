@@ -15,7 +15,7 @@ br;   // the correct way to write an empty tag
 br {} // also good
 "i'm also a new text line"
 
-a.link#main_link.large@href="#"@target="_blank" 
+a.link#main_link.large@href="http://thepaw.hu"@target="_blank" "I'm a link" 
 
 ul.example.list#exampleList {
     li.first "first list item"

@@ -1,12 +1,21 @@
 fs = require 'fs'
 PEG = require "pegjs"
 
-class MustardSyntaxError
+class MustardSyntaxError extends Error
     constructor: (@file, @line, @col, @message, @base_exception)->
+      @name = "Mustard Syntax Error"
+      # Error.apply( @, [@message])
     toString: -> "#{@file}:#{@line} (col:#{@col}) #{@message}"
+
+InterpolationRegexp = /\{\{(.*?)\}\}/g
 
 class Text
     constructor: (@text)->
+        @partials = []
+        
+        for m in @text.match InterpolationRegexp
+          parts = InterpolationRegexp.exec m
+          @partials.push parts[1]
     toString: -> @text
     toHtml: -> @text
 
@@ -49,32 +58,23 @@ class Parser
       # console.log @parser.toSource()
 
     parseFile: (fileName)->
-        console.log "Parsing: #{fileName}"
-        list = @parseIntoList fileName
-        ast = @astConverter.listToAst list
+        @tokens = @parseIntoTokenList fileName
+        ast = @astConverter.listToAst @tokens
         console.log ast.toHtml()
         return ast
-        # contents = fs.readFileSync @fileName
-        # try
-        #     result = @parser.parse contents.toString()
-        #     console.log @astConverter.listToAst result
-        #     return result
-        # catch e
-        #     # throw new MustardSyntaxError()
-        #     console.error e
-        #     throw e
-        # # console.log(data, data.toString())
           
 
-    parseIntoList: (fileName)->
+    parseIntoTokenList: (fileName)->
         contents = fs.readFileSync fileName
         try
             result = @parser.parse contents.toString()
             return result
         catch e
-            console.error e
+            if e.name is "SyntaxError"
+                # throw e
+                throw new MustardSyntaxError(fileName, e.line, e.column, e.message, e)
             throw e
- 
+
 
 
 class AstConverter

@@ -1,0 +1,20 @@
+html {
+
+head {
+    title "Some page"
+}
+
+body#main {
+    section #headline {
+        nav {
+            a@href="/" "Home"
+            a@href="/about" "About"
+        }
+    }
+
+    div#wrapper{
+        article.post
+    }
+}
+
+}

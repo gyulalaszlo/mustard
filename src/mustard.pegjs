@@ -35,9 +35,24 @@ elementContents "element contents"
 
 
 textElement "text"
-    = contentString:string { 
-        return contentString; 
-    }
+    = it:interpolatedString { return it; }
+
+//    = contentString:string { 
+//        return contentString; 
+//    }
+//    / interpolated:interpolatedField { return interpolated; }
+     
+
+interpolatedField "interpolated field"
+  = '{{' _ id:ident _ '}}' { return "{{" + id + "}}"; }
+
+interpolatedString
+    = '"' '"' _ { return "" }
+    / '"' str:stringInternal+ '"' _ { return str; }
+
+stringInternal
+    = '{{' _ id:ident _ '}}' { return "{{" + id + "}}"; } 
+    / chars:chars { return chars; }
 
 
 
@@ -70,7 +85,6 @@ char
 
 identChar
   = [a-zA-Z\-_]
-
 
 
 /*
