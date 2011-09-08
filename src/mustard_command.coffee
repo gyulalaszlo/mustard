@@ -1,60 +1,96 @@
 parser = require './parser'
 util = require 'util'
-jsoutput = require './output_js'
 
 argv = require('optimist')
-    .usage('compile mustard templates')
+    .usage('Compiles mustard templates into classes')
     .demand(1)
-    .options 't'
+    .boolean('t').options 't'
         alias: 'token-stream'
         default: false
         describe: 'Show the tokenized input'
 
-    .options 'a'
+    .boolean('a').options 'a'
         alias: 'ast'
         default: false
         describe: 'Show the built AST'
 
-    .options 'c'
+    .string('C').options 'C'
         alias: 'class-name'
         default: 'Template'
         describe: 'Set the generated class name'
 
+    .boolean('s').options 's'
+        alias: 'show-source'
+        default: false
+        describe: 'Print the source of the template'
+    
+    .string('o').options 'o'
+        alias: 'output-file'
+        default: false
+        describe: 'Output the compiled template class to <file>'
+    
+    .boolean('u').options 'u'
+        alias: 'ugly'
+        default: false
+        describe: 'Remove indentations from output template (for speedup)'
+
    .argv
 
 
-inspect = (obj)->
-  util.inspect(obj, false, 10 )
 
 
-parser = new parser.FileParser
-jso = new jsoutput.JsOutput
+
+inspect = (obj)-> JSON.stringify obj, null, 2
+builder = new parser.Mustard argv.C, 'js'
 
 for arg in argv._
   try
-    console.log "--> parsing: #{arg}"
-    ast = parser.parse(arg)
-    console.log "Tokens:\n", inspect(parser.tokenList()) if argv.t
-    console.log "AST:\n", inspect( ast ) if argv.ast
+    console.log "===> parsing: #{arg}"
+    builder.addFile arg, arg
+    # ast = parser.parse(arg)
+    console.log "--> Tokens:\n", inspect( builder.tokenList() ) if argv.t
+    console.log "--> AST:\n", builder.ast().toString() if argv.ast
 
-    jso.addTemplate ast, arg
+    # jso.addTemplate ast, arg
   catch e
     console.error "Error during parse:\n ", e.toString()
     console.log("--> Token parse tree (if available)\n", inspect(parser.tokenList()) ) if argv.t
     throw e
     return 1
 
-console.log jso.createClass(argv.c)
-jso.evalClass( argv.c )
 
-tpl = eval("new #{argv.c}()")
 
-for arg in argv._
-   console.log tpl.render( arg,
-     artist: "Miles Davis"
-     song: "Miles runs the voodoo down"
-     wrap_tag: "section"
 
-     autoplay_info: "start=0"
-     buy_link: "http://buy.me"
-   )
+try
+  console.log "\n===> Compiling"
+  compileOptions =
+    pretty: !argv.ugly
+
+  # show the source
+  if argv.s
+      console.log "\n--> Source:\n", builder.toSource()
+  #
+  # show the source
+  if argv.o
+      console.log "\n--> Saving source:\n"
+      builder.writeSource(argv.o)
+
+  tpl = builder.toInstance()
+
+
+  for arg in argv._
+     console.log tpl.render( arg,
+       artist: "Miles Davis"
+       song: "Miles runs the voodoo down"
+       wrap_tag: "section"
+
+       autoplay_info: "start=0"
+       buy_link: "http://buy.me"
+     )
+
+catch e
+    console.log "Error during compilation and eval:\n ", e.stack
+    console.log("--> Token parse tree (if available)\n", inspect(parser.tokenList()) ) if argv.t
+    # throw e
+    return 1
+

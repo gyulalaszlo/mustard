@@ -7,12 +7,15 @@ class JsOutput
       @template_functions = {}
     
 
-    addTemplate: (elementList, wrapper_function_name)->
-      stringified_function_name = toId wrapper_function_name
-      @template_functions[wrapper_function_name] =
-        body: @convert elementList, stringified_function_name
-        path: wrapper_function_name
-        name: stringified_function_name
+    addTemplate: (elementList, wrapper_function_name, opts={})->
+        @options = _(opts).defaults
+            pretty: true
+
+        stringified_function_name = toId wrapper_function_name
+        @template_functions[wrapper_function_name] =
+          body: @convert elementList, stringified_function_name
+          path: wrapper_function_name
+          name: stringified_function_name
 
     toId: (str)-> toId(str)
     _: _
@@ -20,11 +23,13 @@ class JsOutput
     createClass: (@className)->
 
         _classTemplate = _.template """
-          
 <%= className %> = (function() {
+
     function <%= className %>(){
         // Constructor. empty for now...
     }
+
+    <%= className %>.prototype.bufferType = (IndentedBuffer || []);
 
     <%= className %>.prototype.render = function(template_name, context) {
         <% _.each(template_functions, function(val, key) { %>
@@ -47,60 +52,52 @@ class JsOutput
       eval( @createClass(className) )
 
     convert: (elementList, wrapper_function_name=null)->
-      @buffer = new IndentedBuffer
-      @buf = new InterpolatedStringBuilder
-      @convertElementList( elementList, wrapper_function_name )
-      body = @buffer.join()
-      body
 
+        @buffer = new IndentedBuffer
+        @buf = new InterpolatedStringBuilder
+        @convertElementList( elementList, wrapper_function_name )
+        body = @buffer.join()
+        body
 
     convertElementList: (elementList, wrapperFunctionName=null)->
         # @buffer.push '(function(){ ' unless wrapperFunctionName
         if wrapperFunctionName
             @buffer.push "function(context) {"
-            @buffer.incIndent()
-            @buffer.push 'var output = []; output.indent = output.outdent = function() { return this; }'
+            @buffer.indent()
+            # @buffer.push 'var output = new this.bufferType(); output.indent = output.outdent = function() { return this; }'
+            @buffer.push 'var output = new this.bufferType();'
         
-        if elementList.elements.length > 1
-            # @buffer.push "output.push({})"
-            # @buffer.incIndent()
-            @buffer.incIndent "output.indent();"
-            @flushInterpolateBuffer()
-
         for element in elementList.elements
-          @convertElement(element)
-        
-        if elementList.elements.length > 1
-            @buffer.decIndent "output.outdent();"
-            @flushInterpolateBuffer()
-
+            @convertElement(element)
 
         if wrapperFunctionName
             @flushInterpolateBuffer()
             @buffer.push 'return output.join("\\n");'
             @buffer.push '}'
 
-            @buffer.decIndent()
-        # @buffer.push ')()' unless wrapperFunctionName
-        #
+            @buffer.outdent()
 
-    flushInterpolateBuffer: ->
-        @buffer.push "output.push(#{@buf.toInterpolated()})"
+    flushInterpolateBuffer: (method='output.push')->
+        @buffer.push "#{method}(#{@buf.toInterpolated()});"
         @buf = new InterpolatedStringBuilder
 
     convertElement: (el)->
+        hasOnlyTextChildren = el.hasOnlyTextChildren()
+
+        # console.log hasOnlyTextChildren
+          # @flushInterpolateBuffer( 'output.indent')
+          # @buffer.indent()
+
     
-        if el instanceof parser.Text
-            # o.push @convertText(el)
-            # @buffer.push "output.push(#{@convertText(el).toInterpolated()});"
+        if parser._mustard_checks.isText el #instanceof parser.Text
             @convertText el, @buf
 
-        if el instanceof parser.Element
+        # if el instanceof parser.Element
+        if parser._mustard_checks.isElement el
             buf = new InterpolatedStringBuilder
             buf.pushString "<"
             @convertText el.name, buf
 
-            # console.log el.interpolated_attributes
             attribute_buffers = {}
             for attr in el.interpolated_attributes
                 name = @convertText attr.name
@@ -121,37 +118,31 @@ class JsOutput
                   buf.pushString '\\"'
 
 
-            # if el.attributes
-            #   for k,v of el.attributes
-            #     buf.pushString ' '
-            #     # console.log k,v
-            #     @convertText k, buf
-            #     buf.pushString '=\\"'
-            #     for single_val, i in v
-            #         @convertText(single_val, buf)
-            #         # dont add space to the last attribute
-            #         buf.pushString ' ' unless i == v.length - 1
-
-            #     buf.pushString '\\"'
-                    
-
             buf.pushString ">"
             @buf.pushBuffer buf
             
-            # @buffer.push "output.push(#{buf.toInterpolated()});"
-            # @buffer.push "output.push([#{buf.join(',')}].join(''));"
-            
             if el.children
-              @convertElementList(el.children)
+                # if hasOnlyTextChildren
+                unless hasOnlyTextChildren
+                    @flushInterpolateBuffer()
+                    @buffer.indent 'output.indent()'
+                @convertElementList(el.children)
+                unless hasOnlyTextChildren
+                    @flushInterpolateBuffer()
+                    @buffer.outdent 'output.outdent()'
 
             buf = new InterpolatedStringBuilder
             buf.pushString "</"
             @convertText el.name, buf
             buf.pushString ">"
-            # @buffer.push "output.push(#{buf.toInterpolated()});"
-            # @buffer.push "output.push([#{buf.join(',')}].join(''));"
             @buf.pushBuffer buf
 
+            if hasOnlyTextChildren and @options.pretty
+                @flushInterpolateBuffer()
+                # @buffer.outdent 'output.outdent()'
+
+          
+ 
             
         
     convertText: (text, o=new InterpolatedStringBuilder)->
@@ -166,33 +157,30 @@ class JsOutput
                 o.pushInterpolation "context.#{partial.interpolate}"
         
         o
-        # return o.toInterpolated()
-
-        # if o.length == 1
-        #     return "#{o[0]}"
-        # "[ #{o.join ', '} ].join('')"
 
 
 toId = (str)-> str.replace(/[^a-zA-Z\-_]+/g, '_')
 
 class IndentedBuffer
-    constructor: (@indent=0, buffer=[])->
-      @buffer = []
+    constructor: (@_indent=0, buffer=[])->
+      @_buffer = []
       @push str for str in buffer
         
 
+    indent:  (strs...)-> @_indent += 1; @push strs...
+    outdent: (strs...)-> @_indent -= 1; @_indent = 0 if @_indent < 0;  @push strs...
 
-    incIndent: (strs...)-> @indent += 1; @push strs...
-    decIndent: (strs...)-> @indent -= 1; @indent = 0 if @indent < 0;  @push strs...
+    # incIndent: (strs...)-> @_indent += 1; @push strs...
+    # decIndent: (strs...)-> @_indent -= 1; @_indent = 0 if @_indent < 0;  @push strs...
     indentString: (strs...)->
-        if @indent > 0
-            return ("    " for i in [0..@indent-1]).join('') + strs.join('')
+        if @_indent > 0
+            return ("    " for i in [0..@_indent-1]).join('') + strs.join('')
         else
             return strs.join('')
 
-    push: (strs...)-> @buffer.push @indentString(strs...) if strs.length > 0
-    unshift: (strs...)-> @buffer.unshift @indentString( strs...)
-    join: (str="\n")-> @buffer.join(str)
+    push: (strs...)-> @_buffer.push @indentString(strs...) if strs.length > 0
+    unshift: (strs...)-> @_buffer.unshift @indentString( strs...)
+    join: (str="\n")-> @_buffer.join(str)
 
     pushMultiLine: (str)->
       lines = str.split /[\n\r]+/g
