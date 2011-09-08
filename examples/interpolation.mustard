@@ -1,2 +1,12 @@
-"hello"
-p.hello "Hello {{who}}"
+{{wrap_tag}}.title {
+    .headline.{{wrap_tag}} @data-{{wrap_tag}}="song" "you are listenting to" 
+    span.artist.link a@href="#" {{artist}}
+    span.song {{ song }}
+    
+    .controls {
+        a.play_button @href="#" @data-autoplay="{{autoplay_info}}" "Play"
+        a.buy_link @href={{buy_link}} @target="_blank" "Buy"
+    }   
+}
+// p @data-{{keyType}}="Hello"
+// div.johnny.{{obj}}#hi

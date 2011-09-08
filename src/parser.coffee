@@ -1,23 +1,20 @@
 fs = require 'fs'
 PEG = require "pegjs"
 
+
+
 class MustardSyntaxError extends Error
     constructor: (@file, @line, @col, @message, @base_exception)->
       @name = "Mustard Syntax Error"
       # Error.apply( @, [@message])
     toString: -> "#{@file}:#{@line} (col:#{@col}) #{@message}"
 
-InterpolationRegexp = /\{\{(.*?)\}\}/g
-
 class Text
-    constructor: (@text)->
-        @partials = []
+    constructor: (obj)->
+        @partials = obj.text
         
-        for m in @text.match InterpolationRegexp
-          parts = InterpolationRegexp.exec m
-          @partials.push parts[1]
-    toString: -> @text
-    toHtml: -> @text
+    toString: -> @partials
+    toHtml: -> @partials
 
 
 class ElementList
@@ -25,28 +22,47 @@ class ElementList
       @elements = []
 
     push: (el)-> @elements.push el
+    length: ()-> @elements.length
 
-    toHtml: -> ( child.toHtml() for child in @elements).join("\n")
+    toHtml: -> ( child.toHtml() for child in @elements)
 
 
 class Element
     constructor: (hash, @children)->
-        @name = hash.declaration.name
+        @name = new Text(hash.declaration.name)
         @attributes= {}
+        # store interpolated attribute names in an array
+        @interpolated_attributes = []
         attr_cache = {}
         # console.log 'hash:', hash.declaration.attributes
         for attrs in hash.declaration.attributes
-            for k,v of attrs
-                # console.log 'attr_pairs:', k, v
-                attr_cache[k] ||= []
-                attr_cache[k].push v
+            if typeof attrs.name is "string"
+              attr_key = attrs.name
+              # console.log 'attr_pairs:', k, v
+              attr_cache[attr_key] ||= []
+              attr_cache[attr_key].push new Text(attrs.value)
+            else
+              attr_key = new Text(attrs.name)
+              # console.log 'attr_pairs:', k, v
+              @interpolated_attributes.push
+                name:attr_key
+                value:new Text(attrs.value)
 
-        for k,v of attr_cache
-          @attributes[k] = v.join(' ')
+        @attributes = attr_cache
 
     toHtml: ()->
-      "<#{@name}#{(' ' + k + '="' + v + '"' for k,v of @attributes).join('')}>#{@children.toHtml()}</#{@name}>"
+        ['<', @name, @attributeTexts(), '>', @children.toHtml(), '</', @name, ">"]
         
+    attributeTexts: ()->
+        attributeTexts = []
+        for k,v of @attributes
+            attributeTexts.push ' ' , k , '="' , ([a.toHtml(), ' '] for a in v) , '"'
+
+        for attr in @interpolated_attributes
+            attributeTexts.push ' ', attr.name.toHtml(), '="' , attr.value.toHtml(), '"'
+
+        attributeTexts
+
 
 
 class Parser
@@ -55,25 +71,33 @@ class Parser
       @grammar = fs.readFileSync "#{__dirname}/mustard.pegjs"
       @parser = PEG.buildParser @grammar.toString()
       @astConverter = new AstConverter
-      # console.log @parser.toSource()
 
-    parseFile: (fileName)->
-        @tokens = @parseIntoTokenList fileName
+    parse: (contents)->
+        @tokens = @_parseIntoTokenList contents
         ast = @astConverter.listToAst @tokens
-        console.log ast.toHtml()
         return ast
+
+    tokenList: ()-> @tokens
           
 
-    parseIntoTokenList: (fileName)->
-        contents = fs.readFileSync fileName
+    _parseIntoTokenList: (contents)->
         try
             result = @parser.parse contents.toString()
             return result
         catch e
-            if e.name is "SyntaxError"
-                # throw e
-                throw new MustardSyntaxError(fileName, e.line, e.column, e.message, e)
+            throw new MustardSyntaxError(fileName, e.line, e.column, e.message, e) if e.name is "SyntaxError"
             throw e
+
+
+class FileParser
+
+    constructor: ->
+        @parser = new Parser()
+
+    parse: (filename)->
+        @parser.parse fs.readFileSync(filename)
+
+    tokenList: ()-> @parser.tokenList()
 
 
 
@@ -86,12 +110,14 @@ class AstConverter
         res
     
     elementFor: (obj)->
+
+        return unless obj instanceof Object
         
         # wtf this needs typeof instead of instanceof is beyond me
-        if typeof obj is 'string'
+        if obj.type == 'text'
             return new Text(obj)
 
-        if obj instanceof Object and (obj.type == 'element')
+        if obj.type == 'element'
           children = new ElementList
           if obj.contents instanceof Array
             children = @listToAst(obj.contents)
@@ -101,3 +127,7 @@ class AstConverter
 
 root = exports ? this
 root.Parser = Parser
+root.FileParser = FileParser
+root.ElementList = ElementList
+root.Element = Element
+root.Text = Text

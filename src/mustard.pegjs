@@ -17,13 +17,13 @@ statement "element statement"
 
 
 elementDeclaration "element declaration"
-    = ident:ident _ attrs:attributeDeclaration* { return {name: ident, attributes:attrs}; }
-
+    = ident:identLiteral _ attrs:attributeDeclaration* { return {name: ident, attributes:attrs}; }
+    / attrs:attributeDeclaration+ { return {name:{type:"text", text:["div"]}, attributes:attrs} }
 
 attributeDeclaration "attributes declaration"
-    = '#' ident:ident _                   { return {id: ident}; }
-    / '.' ident:ident _                 { return {class: ident}; }
-    / '@' ident:ident _ '=' _ value:stringLiteral _  { var o={}; o[ident]=value; return o;  }
+    = '#' ident:identLiteral _           { return {name:{type:'text', text:['id']}, value:ident}; }
+    / '.' ident:identLiteral _           { return { name:{type:'text', text:['class']}, value:ident}; }
+    / '@' ident:identLiteral _ '=' _ value:stringLiteral _  { return {name:ident, value:value};  }
 
 
 elementContents "element contents"
@@ -37,21 +37,28 @@ elementContents "element contents"
 textElement "text"
     = it:stringLiteral { return it; }
 
-//    = contentString:string { 
-//        return contentString; 
-//    }
-//    / interpolated:interpolatedField { return interpolated; }
      
 
-stringLiteral
- = '"' '"' _ { return ""; }
- / '"' st:stringInternal+ '"' _ { return st }
+stringLiteral "string"
+ = '"' '"' _ { return {type:"text", text:[""]}; }
+ / '"' st:stringInternal+ '"' _ { return {type:"text", text:st} }
+ / it:interpolateInternal _ { return {type:"text", text:[it]}}
+
+identLiteral "identifier (normal or interpolated)"
+ = id:identInternal+ { return {type:"text", text:id} }
+
+identInternal
+  = it:identChar+ { return it.join(''); }
+  / interpolateInternal
 
 
 stringInternal
- = '{{' id:ident '}}' { return {interpolate: id} }
+ =  interpolateInternal
     / chr:[^"{]+ { return chr.join('') }
     / chr:'{' { return chr }
+
+interpolateInternal
+ = '{{' _ id:ident _ '}}' { return {interpolate: id} }
 
 
 
