@@ -11,7 +11,7 @@ class IndentedBuffer
 
     indentString: (str)->
         if @_indent > 0
-            a = []; a[@_indent-1]=''; return a.join('    ') +  str
+            a = []; a[@_indent]=''; return a.join('    ') +  str
         else
             return str
 

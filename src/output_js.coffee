@@ -29,7 +29,7 @@ class JsOutput
 
     convert: (elementList, wrapper_function_name=null)->
 
-        @buffer = new IndentedBuffer(3)
+        @buffer = new IndentedBuffer(2)
         @buf = new InterpolatedStringBuilder
         @convertElementList( elementList, wrapper_function_name )
         body = @buffer.join()
@@ -110,8 +110,8 @@ class JsOutput
             @buf.pushString ">"
             # @buf.pushBuffer buf
 
-            # if isPretty
-            #     @flushInterpolateBuffer()
+            if @options.pretty
+                @flushInterpolateBuffer()
 
           
  

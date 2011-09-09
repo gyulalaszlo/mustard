@@ -81,21 +81,21 @@ class Element
 class Parser
 
     constructor:  ->
-        @grammar = fs.readFileSync "#{__dirname}/mustard.pegjs"
-        @parser = PEG.buildParser @grammar.toString()
-        @astConverter = new AstConverter
+        @_grammar = fs.readFileSync "#{__dirname}/mustard.pegjs"
+        @_parser = PEG.buildParser @_grammar.toString()
+        @_astConverter = new AstConverter
 
     parse: (contents)->
-        @tokens = @_parseIntoTokenList contents
-        ast = @astConverter.listToAst @tokens
+        @_tokens = @_parseIntoTokenList contents
+        ast = @_astConverter.listToAst @_tokens
         return ast
 
-    tokenList: ()-> @tokens
+    tokenList: ()-> @_tokens
           
 
     _parseIntoTokenList: (contents)->
         try
-            result = @parser.parse contents.toString()
+            result = @_parser.parse contents.toString()
             return result
         catch e
             throw new MustardSyntaxError(fileName, e.line, e.column, e.message, e) if e.name is "SyntaxError"
@@ -153,9 +153,10 @@ class MustardCompiler
         key = 'default'
         inst = new @(klassNameId, 'js')
         inst.addText text, key
+
         # context = {}
 
-        result = int.compile _(@_default_options).defaults opts
+        result = inst.compile _(opts).defaults MustardCompiler._default_options
         result.toInstance()
 
         
@@ -223,11 +224,14 @@ root._mustard_checks =
     isElementList: (o)-> o instanceof ElementList
     isText: (o)-> o instanceof Text
 
+mustardFunc = (text, opts={})->
+    MustardCompiler.create(text, opts)
 
 
 # root.Parser = Parser
 # root.FileParser = FileParser
 root.MustardCompiler = MustardCompiler
+root.Mustard = mustardFunc
 # root.ElementList = ElementList
 # root.Element = Element
 # root.Text = Text

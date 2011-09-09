@@ -75,7 +75,6 @@ try
       console.log "\n--> Saving source to:#{argv.o}\n"
       result.write(argv.o)
 
-  console.log result._id
   
   tpl = result.toInstance()
 
