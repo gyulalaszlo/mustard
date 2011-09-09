@@ -1,6 +1,7 @@
 fs = require 'fs'
 path = require 'path'
-PEG = require "pegjs"
+# PEG = require "pegjs"
+mustard_pegjs = require '../build/mustard_pegjs'
 jsoutput = require './output_js'
 _ = require '../vendor/underscore'
 {IndentedBuffer} = require './indented_buffer'
@@ -82,7 +83,7 @@ class Parser
 
     constructor:  ->
         @_grammar = fs.readFileSync "#{__dirname}/mustard.pegjs"
-        @_parser = PEG.buildParser @_grammar.toString()
+        # @_parser = PEG.buildParser @_grammar.toString()
         @_astConverter = new AstConverter
 
     parse: (contents)->
@@ -95,7 +96,8 @@ class Parser
 
     _parseIntoTokenList: (contents)->
         try
-            result = @_parser.parse contents.toString()
+            result = mustard_pegjs.parse contents.toString()
+            # result = @_parser.parse contents.toString()
             return result
         catch e
             throw new MustardSyntaxError(fileName, e.line, e.column, e.message, e) if e.name is "SyntaxError"

@@ -17,7 +17,7 @@ statement "element statement"
 
 
 elementDeclaration "element declaration"
-    = ident:identLiteral _ attrs:attributeDeclaration* { return {name: ident, attributes:attrs}; }
+    = ident:tagIdentLiteral _ attrs:attributeDeclaration* { return {name: ident, attributes:attrs}; }
     / attrs:attributeDeclaration+ { return {name:{type:"text", text:["div"]}, attributes:attrs} }
 
 attributeDeclaration "attributes declaration"
@@ -43,9 +43,14 @@ stringLiteral "string"
  = '"' '"' _ { return {type:"text", text:[""]}; }
  / '"' st:stringInternal+ '"' _ { return {type:"text", text:st} }
  / it:interpolateInternal _ { return {type:"text", text:[it]}}
+ / it:interpolateWholeLiteralInternal _ { return {type:"text", text:[it]}}
+
+tagIdentLiteral "tag ident literal (prefixed with '%' if interpolated)"
+  = '%' identLiteral:identLiteral { return identLiteral; }
+    / it:ident { return {type:"text", text:[ it ]} }
 
 identLiteral "identifier (normal or interpolated)"
- = id:identInternal+ { return {type:"text", text:id} }
+  = id:identInternal+ { return {type:"text", text:id} }
 
 identInternal
   = it:identChar+ { return it.join(''); }
@@ -60,6 +65,8 @@ stringInternal
 interpolateInternal
  = '{{' _ id:ident _ '}}' { return {interpolate: id} }
 
+interpolateWholeLiteralInternal
+ = ':' id:ident { return {interpolate: id} }
 
 
 

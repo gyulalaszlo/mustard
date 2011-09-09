@@ -72,7 +72,8 @@ class JsOutput
             @convertText el.name, buf
 
             attribute_buffers = {}
-            for attr in el.interpolated_attributes
+            attrs = el.interpolated_attributes
+            for attr, idx in attrs
                 name = @convertText attr.name
                 if name.hasInterpolation
                   buf.pushString ' '
@@ -82,12 +83,22 @@ class JsOutput
                   buf.pushString '\\"'
                 else
                   name_str = name.toInterpolated(false)
-                  abuf = attribute_buffers[name] ||= new InterpolatedStringBuilder
-                  @convertText attr.value, abuf
+                  # abuf = attribute_buffers[name] ||= new InterpolatedStringBuilder
+                  valueBuffer = new InterpolatedStringBuilder
+                  @convertText attr.value, valueBuffer
+                  # abuf.pushBuffer valueBuffer
+
+                  attribute_buffers[name] ||= []
+                  attribute_buffers[name].push valueBuffer
+                  # console.log idx,  attrs.length - 1
+                  # unless (idx is _(attrs).size() - 1)
+                    # abuf.pushString ' '
 
             for key, attr_buf of attribute_buffers
                   buf.pushString " #{key}=\\\""
-                  buf.pushBuffer attr_buf, ' '
+                  for a_buf, idx in attr_buf
+                      buf.pushBuffer a_buf, ''
+                      buf.pushString ' ' unless idx == attr_buf.length - 1
                   buf.pushString '\\"'
 
 
