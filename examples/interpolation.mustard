@@ -1,7 +1,9 @@
 {{wrap_tag}}.title {
     .headline.{{wrap_tag}} @data-{{wrap_tag}}="song" "you are listenting to" 
-    span.artist.link a@href="#" {{artist}}
+    span.artist.link { a@href="#" {{artist}} }
     span.song {{ song }}
+    p.inline { u "Inline text" }
+    p.inline { u "Inline text" }
     
     .controls {
         a.play_button @href="#" @data-autoplay="{{autoplay_info}}" "Play"

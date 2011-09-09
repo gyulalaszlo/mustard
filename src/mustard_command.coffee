@@ -41,20 +41,20 @@ argv = require('optimist')
 
 
 inspect = (obj)-> JSON.stringify obj, null, 2
-builder = new parser.Mustard argv.C, 'js'
+mustard = new parser.MustardCompiler argv.C, 'js'
 
 for arg in argv._
   try
     console.log "===> parsing: #{arg}"
-    builder.addFile arg, arg
+    mustard.addFile arg
     # ast = parser.parse(arg)
-    console.log "--> Tokens:\n", inspect( builder.tokenList() ) if argv.t
-    console.log "--> AST:\n", builder.ast().toString() if argv.ast
+    console.log "--> Tokens:\n", inspect( mustard.tokenList() ) if argv.t
+    console.log "--> AST:\n", mustard.ast().toString() if argv.ast
 
     # jso.addTemplate ast, arg
   catch e
     console.error "Error during parse:\n ", e.toString()
-    console.log("--> Token parse tree (if available)\n", inspect(parser.tokenList()) ) if argv.t
+    console.log("--> Token parse tree (if available)\n", inspect(mustard.tokenList()) ) if argv.t
     throw e
     return 1
 
@@ -62,24 +62,27 @@ for arg in argv._
 
 
 try
-  console.log "\n===> Compiling"
+  console.log "\n===> Compiling #{mustard.templateNames().join ','}"
   compileOptions =
     pretty: !argv.ugly
+  result = mustard.compile compileOptions
 
   # show the source
   if argv.s
-      console.log "\n--> Source:\n", builder.toSource()
-  #
-  # show the source
+      console.log "\n--> Source:\n", result.source()
+  # save the source
   if argv.o
-      console.log "\n--> Saving source:\n"
-      builder.writeSource(argv.o)
+      console.log "\n--> Saving source to:#{argv.o}\n"
+      result.write(argv.o)
 
-  tpl = builder.toInstance()
+  console.log result._id
+  
+  tpl = result.toInstance()
 
 
   for arg in argv._
-     console.log tpl.render( arg,
+     # console.log parser.MustardCompiler._templateKeyForFile(arg)
+     console.log tpl.render( parser.MustardCompiler._templateKeyForFile(arg),
        artist: "Miles Davis"
        song: "Miles runs the voodoo down"
        wrap_tag: "section"

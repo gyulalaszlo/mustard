@@ -1,5 +1,6 @@
 parser = require './parser'
 _ = require './underscore'
+{IndentedBuffer} = require './indented_buffer'
 
 class JsOutput
 
@@ -17,54 +18,27 @@ class JsOutput
           path: wrapper_function_name
           name: stringified_function_name
 
-    toId: (str)-> toId(str)
-    _: _
-
-    createClass: (@className)->
-
-        _classTemplate = _.template """
-<%= className %> = (function() {
-
-    function <%= className %>(){
-        // Constructor. empty for now...
-    }
-
-    <%= className %>.prototype.bufferType = (IndentedBuffer || []);
-
-    <%= className %>.prototype.render = function(template_name, context) {
-        <% _.each(template_functions, function(val, key) { %>
-        if (template_name === '<%= key %>') return this.<%= val.name %>(context);<% }); %>
-    }
-
-    <% _.each(template_functions, function(val, key) { %>
-    <%= className %>.prototype.<%= val.name %> = <%= val.body%>;
-    <% }); %>
 
 
-    return <%= className %>;
-})();
+    createClass: (@className, @_templates, options)->
+        for key,template of @_templates.all()
+            @addTemplate(template, key, options)
 
-        """
-        return _classTemplate(this)
+        return JsOutput.classTemplate(this)
 
-
-    evalClass: (className)->
-      eval( @createClass(className) )
 
     convert: (elementList, wrapper_function_name=null)->
 
-        @buffer = new IndentedBuffer
+        @buffer = new IndentedBuffer(3)
         @buf = new InterpolatedStringBuilder
         @convertElementList( elementList, wrapper_function_name )
         body = @buffer.join()
         body
 
     convertElementList: (elementList, wrapperFunctionName=null)->
-        # @buffer.push '(function(){ ' unless wrapperFunctionName
         if wrapperFunctionName
             @buffer.push "function(context) {"
             @buffer.indent()
-            # @buffer.push 'var output = new this.bufferType(); output.indent = output.outdent = function() { return this; }'
             @buffer.push 'var output = new this.bufferType();'
         
         for element in elementList.elements
@@ -72,21 +46,20 @@ class JsOutput
 
         if wrapperFunctionName
             @flushInterpolateBuffer()
-            @buffer.push 'return output.join("\\n");'
-            @buffer.push '}'
+            joinChar = if @options.pretty then '\\n' else ''
+            @buffer.push 'return output.join("'+joinChar+'");'
 
-            @buffer.outdent()
+            @buffer.outdent '}'
+            # @buffer.outdent()
 
     flushInterpolateBuffer: (method='output.push')->
+        return if @buf.length() is 0
         @buffer.push "#{method}(#{@buf.toInterpolated()});"
         @buf = new InterpolatedStringBuilder
 
     convertElement: (el)->
-        hasOnlyTextChildren = el.hasOnlyTextChildren()
+        needsPretty = !el.hasOnlyTextChildren() and @options.pretty
 
-        # console.log hasOnlyTextChildren
-          # @flushInterpolateBuffer( 'output.indent')
-          # @buffer.indent()
 
     
         if parser._mustard_checks.isText el #instanceof parser.Text
@@ -123,23 +96,22 @@ class JsOutput
             
             if el.children
                 # if hasOnlyTextChildren
-                unless hasOnlyTextChildren
+                if needsPretty
                     @flushInterpolateBuffer()
-                    @buffer.indent 'output.indent()'
+                    @buffer.indent 'output.indent();'
                 @convertElementList(el.children)
-                unless hasOnlyTextChildren
+                if needsPretty
                     @flushInterpolateBuffer()
-                    @buffer.outdent 'output.outdent()'
+                    @buffer.outdent 'output.outdent();'
 
-            buf = new InterpolatedStringBuilder
-            buf.pushString "</"
-            @convertText el.name, buf
-            buf.pushString ">"
-            @buf.pushBuffer buf
+            # buf = new InterpolatedStringBuilder
+            @buf.pushString "</"
+            @convertText el.name, @buf
+            @buf.pushString ">"
+            # @buf.pushBuffer buf
 
-            if hasOnlyTextChildren and @options.pretty
-                @flushInterpolateBuffer()
-                # @buffer.outdent 'output.outdent()'
+            # if isPretty
+            #     @flushInterpolateBuffer()
 
           
  
@@ -156,35 +128,58 @@ class JsOutput
             if partial.interpolate
                 o.pushInterpolation "context.#{partial.interpolate}"
         
-        o
+        return o
 
+    _: _
+
+
+    @classTemplate: _.template """
+
+<%= className %> = (function() {
+    
+    function <%= className %>(){
+        // Constructor. empty for now...
+    }
+
+    <%= className %>.prototype.bufferType = IndentedBuffer;
+
+    <% if (_(template_functions).size() > 1) { %>
+
+    <%= className %>.prototype.render = function(template_name, context) {
+        <% _.each(template_functions, function(template, key) { %>
+        if (template_name === '<%= template.path %>') return this.<%= template.name %>(context);<% }); %>
+    }
+
+    <% } else { %>
+
+    <%= className %>.prototype.render = function( template_name, context ) {
+        <% var template = _(template_functions).values()[0]; %>
+        if (context == null) { 
+            context = template_name;
+            template_name = '<%= template.name %>';
+        }
+        if (template_name === '<%= template.path %>') return this.<%= template.name %>(context);
+    }
+
+    <% } %>
+
+    <% _.each(template_functions, function(val, key) { %>
+
+    /*
+        Template: <%= val.path %>
+    */
+    <%= className %>.prototype.<%= val.name %> = 
+<%= val.body %>;
+    <% }); %>
+
+
+    return <%= className %>;
+})();
+
+        """
+ 
 
 toId = (str)-> str.replace(/[^a-zA-Z\-_]+/g, '_')
-
-class IndentedBuffer
-    constructor: (@_indent=0, buffer=[])->
-      @_buffer = []
-      @push str for str in buffer
-        
-
-    indent:  (strs...)-> @_indent += 1; @push strs...
-    outdent: (strs...)-> @_indent -= 1; @_indent = 0 if @_indent < 0;  @push strs...
-
-    # incIndent: (strs...)-> @_indent += 1; @push strs...
-    # decIndent: (strs...)-> @_indent -= 1; @_indent = 0 if @_indent < 0;  @push strs...
-    indentString: (strs...)->
-        if @_indent > 0
-            return ("    " for i in [0..@_indent-1]).join('') + strs.join('')
-        else
-            return strs.join('')
-
-    push: (strs...)-> @_buffer.push @indentString(strs...) if strs.length > 0
-    unshift: (strs...)-> @_buffer.unshift @indentString( strs...)
-    join: (str="\n")-> @_buffer.join(str)
-
-    pushMultiLine: (str)->
-      lines = str.split /[\n\r]+/g
-      @push line for line in lines
 
 
 
@@ -193,6 +188,8 @@ class InterpolatedStringBuilder
       @buffer = []
       @isString = []
       @hasInterpolation = false
+
+    length: -> @buffer.length
 
     pushInterpolation: (stuff...)->
       for s in stuff
@@ -239,3 +236,4 @@ class InterpolatedStringBuilder
 
 root = exports ? this
 root.JsOutput = JsOutput
+root.IndentedBuffer = IndentedBuffer

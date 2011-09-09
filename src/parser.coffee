@@ -3,13 +3,21 @@ path = require 'path'
 PEG = require "pegjs"
 jsoutput = require './output_js'
 _ = require '../vendor/underscore'
+{IndentedBuffer} = require './indented_buffer'
 
 
+# Exceptions
+# ==========
+#
 
 class MustardSyntaxError extends Error
     constructor: (@file, @line, @col, @message, @base_exception)->
         @name = "Mustard Syntax Error"
     toString: -> "#{@file}:#{@line} (col:#{@col}) #{@message}"
+
+# 
+# Elements
+# ========
 
 class Text
     constructor: (obj)-> @partials = obj.text
@@ -33,16 +41,13 @@ class Element
         # store interpolated attribute names in an array
         @interpolated_attributes = []
         attr_cache = {}
-        # console.log 'hash:', hash.declaration.attributes
         for attrs in hash.declaration.attributes
             if typeof attrs.name is "string"
               attr_key = attrs.name
-              # console.log 'attr_pairs:', k, v
               attr_cache[attr_key] ||= []
               attr_cache[attr_key].push new Text(attrs.value)
             else
               attr_key = new Text(attrs.name)
-              # console.log 'attr_pairs:', k, v
               @interpolated_attributes.push
                 name:attr_key
                 value:new Text(attrs.value)
@@ -60,14 +65,18 @@ class Element
         attributeTexts
 
     hasOnlyTextChildren: ()->
-        console.log @children
         for child in @children.elements
-          console.log 'io Text:', (child instanceof Text)
           return false unless (child instanceof Text)
         true
 
     toString: ()-> "[element <#{@name}> - #{@attributeTexts()} - #{@children}]"
 
+
+
+#
+# Parser
+# ======
+#
 
 class Parser
 
@@ -90,54 +99,64 @@ class Parser
             return result
         catch e
             throw new MustardSyntaxError(fileName, e.line, e.column, e.message, e) if e.name is "SyntaxError"
-            throw e
 
 
+class Templates
+    
+    constructor: ->
+        @templates = {}
 
-class Mustard
+    addTemplate: (key, elementList)-> @templates[key] = elementList
+    all: -> @templates
+
+    names: ()-> _(@templates).keys()
+
+#
+# Main class
+# ==========
+#
+
+
+class MustardCompiler
+    @_default_options =
+        pretty: true
+        
     constructor: (@klassName, @target='js')->
+        @_templates = new Templates
         @_parser = new Parser
-        @_target = switch target
+        @_options = {}
+        @_target = switch @target
             when 'js' then new jsoutput.JsOutput
+    
     
     
     # add a text blob as a new template method for the given key
     addText: (text, key)->
         @_ast = @_parser.parse text
-        @_target.addTemplate @_ast, key
+        @_templates.addTemplate key, @_ast
     
     # add a file as a new template method for the given key
-    addFile: (targetFile, key=path.basename(targetFile))->
+    addFile: (targetFile, key=MustardCompiler._templateKeyForFile(targetFile))->
         @addText fs.readFileSync(targetFile), key
 
-    # return an evaluated klass of the template (JS only)
-    # optsions:
-    #   context: assign the template to the given context
-    toClass: (opts={})->
-        opts = _(opts).defaults
-            context:root
+    # compile the templates into a class using the current target
+    compile: (options)->
+        source = @_target.createClass @klassName, @_templates ,options
+        return new CompilationResult(@target, source)
 
-        throw '.toClass() is only supported for the JS target' if @target isnt 'js'
-        @_target.evalClass @klassName
+    # get a list of templates added
+    templateNames: -> @_templates.names()
 
-    # return an evaluated instance of the template (JS only)
-    toInstance: (opts={})->
-        new ( @toClass(opts) )()
-
-
-    # return the generated template class source
-    toSource: (opts={})->
-        @_target.createClass @klassName
-
-    # write the source to a file
-    writeSource: (filename, opts={})->
-        fs.writeFile filename, @toSource()
-
-
-    @compile: (text, opts={})->
-        klassNameId = uniqueId("Template_#{new Date().getTime();}")
+    # compile a template on the fly to a class.
+    @create: (text, opts={})->
+        klassNameId = _.uniqueId("Template_#{new Date().getTime().toString(32);}_")
+        key = 'default'
         inst = new @(klassNameId, 'js')
+        inst.addText text, key
+        # context = {}
 
+        result = int.compile _(@_default_options).defaults opts
+        result.toInstance()
 
         
 
@@ -148,7 +167,30 @@ class Mustard
 
     # the AST of the last template parsed
     ast: -> @_ast
-        
+
+    @_templateKeyForFile = (f)->
+        path.dirname(f) + '/' + path.basename(f, '.mustard')
+
+
+class CompilationResult
+
+    constructor: (@_target, @_source)->
+
+    target: -> @_target
+    source: -> @_source
+
+    toString: -> @source()
+
+    write: (filename)-> fs.writeFile filename, @source()
+
+    toKlass: (context={})->
+        throw new Error('.toClass() is only supported for the JS target') if @_target isnt 'js'
+        eval @source()
+
+    toInstance: (context={})-> 
+        klass = @toKlass(context)
+        return new klass()
+
 
 
 class AstConverter
@@ -182,9 +224,10 @@ root._mustard_checks =
     isText: (o)-> o instanceof Text
 
 
+
 # root.Parser = Parser
 # root.FileParser = FileParser
-root.Mustard = Mustard
+root.MustardCompiler = MustardCompiler
 # root.ElementList = ElementList
 # root.Element = Element
 # root.Text = Text
