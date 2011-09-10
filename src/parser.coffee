@@ -58,11 +58,13 @@ class Templates
     
     constructor: ->
         @templates = {}
+        @_protos = {}
 
     addTemplate: (key, elementList)-> @templates[key] = elementList
-    addProto: (key, proto)->  @templates[key] = proto.children
+    addProto: (key, proto)->  @_protos[key] = proto.children
 
     all: -> @templates
+    allPrototypes: -> @_protos
 
     names: ()-> _(@templates).keys()
 
@@ -75,6 +77,7 @@ class Templates
 class MustardCompiler
     @_default_options =
         pretty: true
+        debug: false
         
     constructor: (@klassName, @target='js')->
         @_parser = new Parser
@@ -112,7 +115,7 @@ class MustardCompiler
         # context = {}
 
         result = inst.compile _(opts).defaults MustardCompiler._default_options
-        # console.log result.toString()
+        console.log result.toString() if opts.debug
         result.toInstance()
 
         

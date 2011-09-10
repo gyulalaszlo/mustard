@@ -22,9 +22,14 @@ class JsOutput
 
     createClass: (@className, @_templates, options)->
         # populate symbol table
-        @_symbols = {}
-        for key,template of @_templates.all()
-            @_symbols[key] = true
+        @_symbols = new ProtoSymbolTable()
+        for key,template of @_templates.allPrototypes()
+            @_symbols.addProxy key, template
+
+        for key, symbol of @_symbols.all()
+            console.log @_symbols.all(), symbol
+            @_addTemplate symbol.template(), key, options
+            
 
         for key,template of @_templates.all()
             @_addTemplate(template, key, options)
@@ -41,11 +46,12 @@ class JsOutput
 
     convertElementList: (elementList, wrapIntoFunction=false)->
         if wrapIntoFunction
-            @buffer.push "function(context, output) {"
+            @buffer.push "function() {"
             @buffer.indent()
-            @buffer.push 'var __context; if (output == null) { __context = new __contextWrapper(context); }'
-            @buffer.push 'else { __context = context; }'
-            @buffer.push 'if (output == null) { output = new __bufferType(); }'
+            # @buffer.push 'var __context; if (output == null) { __context = new __contextWrapper(context); }'
+            @buffer.push 'var __context = this.__context, output = this.__context.buffer;'
+            # @buffer.push 'else { __context = context; }'
+            # @buffer.push 'if (output == null) { output = new __bufferType(); }'
             
         for element in elementList.elements
             @convertElement(element)
@@ -53,15 +59,19 @@ class JsOutput
         if wrapIntoFunction
             @flushInterpolateBuffer()
             joinChar = if @options.pretty then '\\n' else ''
-            @buffer.push 'return output.join("'+joinChar+'");'
+            # @buffer.push 'return output.join("'+joinChar+'");'
 
             @buffer.outdent '}'
             # @buffer.outdent()
+
+
 
     flushInterpolateBuffer: (method='output.push')->
         return if @buf.length() is 0
         @buffer.push "#{method}(#{@buf.toInterpolated()});"
         @buf = new InterpolatedStringBuilder
+
+
 
 
     convertScope: (el)->
@@ -84,6 +94,8 @@ class JsOutput
         @buffer.outdent "); // end of scope: #{el.name}"
 
 
+
+
     convertElement: (el)->
         needsPretty = !el.hasOnlyTextChildren() and @options.pretty
 
@@ -92,10 +104,10 @@ class JsOutput
         
         if AstElement.isElement el
             elName = el.name.toRawString()
-            if @_symbols[elName]
+            if @_symbols.exists elName
                 # a = 1
                 @flushInterpolateBuffer()
-                @buffer.push "this.render('#{elName}', context, output);"
+                @buffer.push "this.render('#{elName}', __context, output);"
                 # @buffer.push "this.render('#{JSON.stringify elName}');"
             else
                 @_convertElementOpeningTag el, needsPretty
@@ -212,9 +224,30 @@ class JsOutput
             context = template_name;
             template_name = 'default';
         }
+        var __context, __output, __isOutermost = false;
+
+        if (this.__context) { } else {
+          __isOutermost = true;
+          __output = new __bufferType();
+          this.__context = new __contextWrapper(this, context, __output );
+        }
+        __context = this.__context;
+
+        switch (template_name) {
         <% _.each(template_functions, function(template, key) { %>
-        if (template_name === '<%= template.path %>') 
-            return this.<%= template.name %>(context, output);<% }); %>
+            case '<%= template.path %>': 
+                this.<%= template.name %>();
+                break;
+        <% }); %>
+            default:
+                throw new Error("No such template with name: '" + template_name
+                    + "'. Available Templates: ['<%= _(template_functions).keys().join("', '") %>']");
+        }
+        
+        if (__isOutermost) {
+            delete this.__context;
+            return __output.join('')
+        }
     }
 
 
@@ -238,6 +271,30 @@ class JsOutput
 toId = (str)-> str.replace(/[^a-zA-Z\-_]+/g, '_')
 
 
+class ProtoSymbolTable
+    constructor: ->
+        @_symbols = {}
+        @_exists = {}
+    
+    exists: (key)-> @_symbols[key] != undefined
+    addProxy: (key, template)-> @_symbols[key] = new ProtoSymbolProxy(key, template)
+
+    all: -> @_symbols
+
+    # add: (key)->
+
+class ProtoSymbolProxy
+    constructor: (@_name, @_template)->
+
+    isProxy: -> true
+    name: -> @_name
+    template: -> @_template
+
+class ProtoSymbol
+    constructor:(@_name)->
+    isProxy: -> false
+    name: -> @_name
+        
 
 class InterpolatedStringBuilder
     constructor: ()->

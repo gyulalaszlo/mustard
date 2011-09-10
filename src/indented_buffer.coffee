@@ -26,9 +26,10 @@ class IndentedBuffer
 
 
 class ContextWrapper
-    constructor: (@context, @name)->
+    constructor: (@template, @context, @buffer )->
         @scopes = {}
         # @buffer = new IndentedBuffer()
+
     
     get: (name)->
         obj = @context
@@ -61,20 +62,22 @@ class ContextWrapper
 
         if params.length is 0
             unless scope in [ false, null, undefined, '', 0, 'false' ]
-                func(this, buffer)
+                func.call(this.template)
             return
 
         if params.length is 1
+            
             if scope instanceof Array
                 [key] = params
                 for v in scope
                     @scopes[key] = v
-                    func(this, buffer)
+                    func.call(this.template)
                     delete @scopes[key]
                 return
+
             if scopeType is 'object'
                 @scopes[params[0] ]= scope
-                func(this, buffer)
+                func.call(this.template)
                 delete @scopes[params[0]]
                 return
 
@@ -83,8 +86,8 @@ class ContextWrapper
                 [key, value] = params
                 for k, v of scope
                     [@scopes[key], @scopes[value]] = [k, v]
-                    func(this, buffer)
-                    delete @scopes[key]; delete @scopes[value];
+                    func.call(this.template)
+                    delete @scopes[key]; delete @scopes[value]
                 return
  
 

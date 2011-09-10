@@ -1,16 +1,34 @@
 _ = require '../vendor/underscore'
 {Mustard} = require '../src/parser'
 
-check_render = (input, output, context={}) ->
-    tpl = Mustard input, pretty:false
+check_render = (input, output, context={}, debug=false) ->
+    tpl = Mustard input, pretty:false, debug:debug
     expect( tpl.render(context) ).toEqual(output)
 
 check_render_hash = (context, expected)->
     [context, expected] = [{}, context ] unless expected
         
     for input, output of expected
-        check_render input, output, context
+        if input not in ['_debug']
+            check_render input, output, context, expected._debug
         
+context =
+    artist_id: 'brixandbones'
+    artist: "BrixAndBones"
+    title: "(Say my name) I'll Play your game boy"
+    id: 'track_07'
+    slug: 'say_my_name'
+    year: 2011
+    track: 2
+    element: 'section'
+    formats:
+        portable: 'portable.mp3'
+        hq: 'hq.mp3'
+    
+    key: -> "bb-#{@id}"
+    url: -> "/#{@artist_id}/#{@year}/#{@slug}"
+    files: -> "files/#{val}" for format, val of @formats
+
 describe 'templates', ->
 
     
@@ -51,22 +69,6 @@ describe 'templates', ->
 
 describe 'interpolation', ->
     
-    context =
-        artist_id: 'brixandbones'
-        artist: "BrixAndBones"
-        title: "(Say my name) I'll Play your game boy"
-        id: 'track_07'
-        slug: 'say_my_name'
-        year: 2011
-        track: 2
-        element: 'section'
-        formats:
-            portable: 'portable.mp3'
-            hq: 'hq.mp3'
-        
-        key: -> "bb-#{@id}"
-        url: -> "/#{@artist_id}/#{@year}/#{@slug}"
-        files: -> "files/#{val}" for format, val of @formats
 
     describe 'attribute interpolation', ->
 
@@ -138,4 +140,11 @@ describe 'declarations', ->
             'nav_link =  li.nav_link { a@href="/" "home" } nav_link; nav_link; ':
                 '<li class="nav_link"><a href="/">home</a></li>' +
                 '<li class="nav_link"><a href="/">home</a></li>'
+
+describe 'Debug', ->
+    it '...', ->
+        check_render_hash context,
+            _debug:true
+            'world = "world" "hello " world': 'hello world'
+            # ':formats -> :format { {{format.hq}}  }': 'hq.mp3'
                 
