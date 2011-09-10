@@ -83,5 +83,9 @@ coffeeCompileTask = ->
 #     console.log "coffee -o #{task.output} #{task.input}"
 
 task 'build:parser', 'Build the PEG parser', ['src/mustard.pegjs'], pegjsTask()
-task 'build', "Build the output", ['task(build:parser)'], ->
+task 'build', "Build the output", ['task(build:parser)'], -> @finished()
+
+task 'spec', 'Run the specs', ['task(build)'], ->
+    @exec "jasmine-node spec --coffee"
+    @finished()
   

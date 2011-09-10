@@ -1,6 +1,6 @@
-parser = require './parser'
 _ = require './underscore'
 {ContextWrapper, IndentedBuffer} = require './indented_buffer'
+{AstElement} = require './elements'
 
 class JsOutput
 
@@ -8,7 +8,7 @@ class JsOutput
       @template_functions = {}
     
 
-    addTemplate: (elementList, wrapper_function_name, opts={})->
+    _addTemplate: (elementList, wrapper_function_name, opts={})->
         @options = _(opts).defaults
             pretty: true
 
@@ -21,14 +21,18 @@ class JsOutput
 
 
     createClass: (@className, @_templates, options)->
+        # populate symbol table
+        @_symbols = {}
         for key,template of @_templates.all()
-            @addTemplate(template, key, options)
+            @_symbols[key] = true
+
+        for key,template of @_templates.all()
+            @_addTemplate(template, key, options)
 
         return JsOutput.classTemplate(this)
 
 
     convert: (elementList, wrapper_function_name=null)->
-
         @buffer = new IndentedBuffer(2)
         @buf = new InterpolatedStringBuilder
         @convertElementList( elementList, wrapper_function_name )
@@ -43,7 +47,6 @@ class JsOutput
             @buffer.push 'else { __context = context; }'
             @buffer.push 'if (output == null) { output = new __bufferType(); }'
             
-        
         for element in elementList.elements
             @convertElement(element)
 
@@ -59,6 +62,7 @@ class JsOutput
         return if @buf.length() is 0
         @buffer.push "#{method}(#{@buf.toInterpolated()});"
         @buf = new InterpolatedStringBuilder
+
 
     convertScope: (el)->
         @flushInterpolateBuffer()
@@ -83,69 +87,83 @@ class JsOutput
     convertElement: (el)->
         needsPretty = !el.hasOnlyTextChildren() and @options.pretty
 
-
-        if parser._mustard_checks.isScope el
-            @convertScope el
-   
-        if parser._mustard_checks.isText el #instanceof parser.Text
-            @convertText el, @buf
-
-        if parser._mustard_checks.isElement el
-            buf = new InterpolatedStringBuilder
-            buf.pushString "<"
-            @convertText el.name, buf
-
-            attribute_buffers = {}
-            attrs = el.interpolated_attributes
-            for attr, idx in attrs
-                name = @convertText attr.name
-                if name.hasInterpolation
-                  buf.pushString ' '
-                  @convertText attr.name, buf
-                  buf.pushString '=\\"'
-                  @convertText attr.value, buf
-                  buf.pushString '\\"'
-                else
-                  name_str = name.toInterpolated(false)
-                  valueBuffer = new InterpolatedStringBuilder
-                  @convertText attr.value, valueBuffer
-
-                  attribute_buffers[name] ||= []
-                  attribute_buffers[name].push valueBuffer
-
-            for key, attr_buf of attribute_buffers
-                  buf.pushString " #{key}=\\\""
-                  for a_buf, idx in attr_buf
-                      buf.pushBuffer a_buf, ''
-                      buf.pushString ' ' unless idx == attr_buf.length - 1
-                  buf.pushString '\\"'
-
-
-            buf.pushString ">"
-            @buf.pushBuffer buf
-            
-            if el.children
-                # if hasOnlyTextChildren
-                if needsPretty
-                    @flushInterpolateBuffer()
-                    @buffer.indent 'output.indent();'
-                @convertElementList(el.children)
-                if needsPretty
-                    @flushInterpolateBuffer()
-                    @buffer.outdent 'output.outdent();'
-
-            # buf = new InterpolatedStringBuilder
-            @buf.pushString "</"
-            @convertText el.name, @buf
-            @buf.pushString ">"
-            # @buf.pushBuffer buf
-
-            if @options.pretty
+        @convertScope el if AstElement.isScope el
+        @convertText el, @buf if AstElement.isText el
+        
+        if AstElement.isElement el
+            elName = el.name.toRawString()
+            if @_symbols[elName]
+                # a = 1
                 @flushInterpolateBuffer()
+                @buffer.push "this.render('#{elName}', context, output);"
+                # @buffer.push "this.render('#{JSON.stringify elName}');"
+            else
+                @_convertElementOpeningTag el, needsPretty
+                @_convertElementChildren el, needsPretty
+                @_convertElementClosingTag el
 
-          
- 
-            
+        # if AstElement.isProto el
+        #     @convertElementList
+
+    
+    _convertElementOpeningTag: (el, needsPretty)->
+        buf = new InterpolatedStringBuilder
+        buf.pushString "<"
+        @convertText el.name, buf
+
+        attribute_buffers = {}
+        attrs = el.interpolated_attributes
+        for attr, idx in attrs
+            name = @convertText attr.name
+            if name.hasInterpolation
+              buf.pushString ' '
+              @convertText attr.name, buf
+              buf.pushString '=\\"'
+              @convertText attr.value, buf
+              buf.pushString '\\"'
+            else
+              name_str = name.toInterpolated(false)
+              valueBuffer = new InterpolatedStringBuilder
+              @convertText attr.value, valueBuffer
+
+              attribute_buffers[name] ||= []
+              attribute_buffers[name].push valueBuffer
+
+        for key, attr_buf of attribute_buffers
+              buf.pushString " #{key}=\\\""
+              for a_buf, idx in attr_buf
+                  buf.pushBuffer a_buf, ''
+                  buf.pushString ' ' unless idx == attr_buf.length - 1
+              buf.pushString '\\"'
+
+
+        buf.pushString ">"
+        @buf.pushBuffer buf
+        
+
+    _convertElementChildren: (el, needsPretty)->
+        if el.children
+            # if hasOnlyTextChildren
+            if needsPretty
+                @flushInterpolateBuffer()
+                @buffer.indent 'output.indent();'
+            @convertElementList(el.children)
+            if needsPretty
+                @flushInterpolateBuffer()
+                @buffer.outdent 'output.outdent();'
+
+    _convertElementClosingTag: (el)->
+        
+       # buf = new InterpolatedStringBuilder
+        @buf.pushString "</"
+        @convertText el.name, @buf
+        @buf.pushString ">"
+        # @buf.pushBuffer buf
+
+        if @options.pretty
+            @flushInterpolateBuffer()
+        
+         
         
     convertText: (text, o=new InterpolatedStringBuilder)->
 
@@ -173,6 +191,7 @@ class JsOutput
         
         return o.toList()
 
+    toString: -> "JSOutput"
       
     _: _
 
@@ -187,25 +206,18 @@ class JsOutput
     var __bufferType = IndentedBuffer;
     var __contextWrapper = ContextWrapper;
 
-    <% if (_(template_functions).size() > 1) { %>
 
-    <%= className %>.prototype.render = function(template_name, context) {
-        <% _.each(template_functions, function(template, key) { %>
-        if (template_name === '<%= template.path %>') return this.<%= template.name %>(context);<% }); %>
-    }
-
-    <% } else { %>
-
-    <%= className %>.prototype.render = function( template_name, context ) {
-        <% var template = _(template_functions).values()[0]; %>
+    <%= className %>.prototype.render = function(template_name, context, output) {
         if (context == null) { 
             context = template_name;
-            template_name = '<%= template.name %>';
+            template_name = 'default';
         }
-        if (template_name === '<%= template.path %>') return this.<%= template.name %>(context);
+        <% _.each(template_functions, function(template, key) { %>
+        if (template_name === '<%= template.path %>') 
+            return this.<%= template.name %>(context, output);<% }); %>
     }
 
-    <% } %>
+
 
     <% _.each(template_functions, function(val, key) { %>
 

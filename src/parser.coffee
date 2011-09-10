@@ -3,6 +3,7 @@ path = require 'path'
 # PEG = require "pegjs"
 mustard_pegjs = require '../build/mustard_pegjs'
 jsoutput = require './output_js'
+{AstConverter, _mustard_checks} = require './elements'
 _ = require '../vendor/underscore'
 {IndentedBuffer, ContextWrapper} = require './indented_buffer'
 
@@ -16,97 +17,7 @@ class MustardSyntaxError extends Error
         @name = "Mustard Syntax Error"
     toString: -> "#{@file}:#{@line} (col:#{@col}) #{@message}"
 
-# 
-# Elements
-# ========
 
-class Text
-    constructor: (obj)-> @partials = obj.text
-    toString: -> @partials
-    hasOnlyTextChildren: -> true
-    toString: -> "[text: #{JSON.stringify _(@partials).map( (e)->JSON.stringify e ).join(' ')}]"
-
-
-class ElementList
-    constructor: -> @elements = []
-    push: (el)-> @elements.push el
-    length: ()-> @elements.length
-    toString: -> "[elementList #{_.map(@elements, (e)-> e.toString()).join("\n") }]"
-
-
-class Element
-    constructor: (hash, @children)->
-        @name = new Text(hash.declaration.name)
-        @attributes= {}
-        # store interpolated attribute names in an array
-        @interpolated_attributes = []
-        attr_cache = {}
-        for attrs in hash.declaration.attributes
-            if typeof attrs.name is "string"
-              attr_key = attrs.name
-              attr_cache[attr_key] ||= []
-              attr_cache[attr_key].push new Text(attrs.value)
-            else
-              attr_key = new Text(attrs.name)
-              @interpolated_attributes.push
-                name:attr_key
-                value:new Text(attrs.value)
-
-        @attributes = attr_cache
-
-    attributeTexts: ()->
-        attributeTexts = []
-        for k,v of @attributes
-            attributeTexts.push ' ' , k , '="' , ([a.toString(), ' '] for a in v) , '"'
-
-        for attr in @interpolated_attributes
-            attributeTexts.push ' ', attr.name.toString(), '="' , attr.value.toString(), '"'
-
-        attributeTexts
-
-    hasOnlyTextChildren: ()->
-        for child in @children.elements
-          return false unless (child instanceof Text)
-        true
-
-    toString: ()-> "[element <#{@name}> - #{@attributeTexts()} - #{@children}]"
-
-
-class Scope
-    
-    constructor: (hash, @children)->
-        @name = new Text(hash.name)
-        @parameters = []
-        # console.log params
-        @parameters.push new Text(param) for param in hash.parameters
-
-    toString: -> "[scope #{JSON.stringify(@name)} - #{@children}]"
-    hasOnlyTextChildren: -> false
-
-class AstConverter
-    constructor: ->
-    listToAst: (list_in)->
-        res = new ElementList
-        for el in list_in
-            res.push @elementFor(el)
-        res
-
-    getChildrenFor: (obj)->
-        children = new ElementList
-        if obj.contents instanceof Array
-            children = @listToAst(obj.contents)
-        children
-
-    
-    elementFor: (obj)->
-
-        return unless obj instanceof Object
-        
-        return switch obj.type
-            when 'text' then new Text(obj)
-            when 'scope' then new Scope(obj, @getChildrenFor(obj))
-            when 'element' then new Element(obj, @getChildrenFor(obj))
- 
 
 #
 # Parser
@@ -115,17 +26,23 @@ class AstConverter
 
 class Parser
 
-    constructor:  ->
+    constructor:  ()->
         @_grammar = fs.readFileSync "#{__dirname}/mustard.pegjs"
         # @_parser = PEG.buildParser @_grammar.toString()
-        @_astConverter = new AstConverter
+        @_templates = new Templates
+        @_astConverter = new AstConverter()
 
     parse: (contents)->
         @_tokens = @_parseIntoTokenList contents
         ast = @_astConverter.listToAst @_tokens
+        for key, proto of @_astConverter.prototypes()
+            # console.log key, proto.toString()
+            @_templates.addProto key, proto
+            
         return ast
 
     tokenList: ()-> @_tokens
+    templates: ()-> @_templates
           
 
     _parseIntoTokenList: (contents)->
@@ -143,6 +60,8 @@ class Templates
         @templates = {}
 
     addTemplate: (key, elementList)-> @templates[key] = elementList
+    addProto: (key, proto)->  @templates[key] = proto.children
+
     all: -> @templates
 
     names: ()-> _(@templates).keys()
@@ -158,8 +77,8 @@ class MustardCompiler
         pretty: true
         
     constructor: (@klassName, @target='js')->
-        @_templates = new Templates
         @_parser = new Parser
+        @_templates = @_parser.templates()
         @_options = {}
         @_target = switch @target
             when 'js' then new jsoutput.JsOutput
@@ -234,21 +153,9 @@ class CompilationResult
        
 root = exports ? this
 
-# export checking functions
-root._mustard_checks =
-    isElement: (o)-> o instanceof Element
-    isElementList: (o)-> o instanceof ElementList
-    isText: (o)-> o instanceof Text
-    isScope: (o)-> o instanceof Scope
-
 mustardFunc = (text, opts={})->
     MustardCompiler.create(text, opts)
 
 
-# root.Parser = Parser
-# root.FileParser = FileParser
 root.MustardCompiler = MustardCompiler
 root.Mustard = mustardFunc
-# root.ElementList = ElementList
-# root.Element = Element
-# root.Text = Text

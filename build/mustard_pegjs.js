@@ -616,47 +616,73 @@ module.exports = (function(){
         
         var savedReportMatchFailures = reportMatchFailures;
         reportMatchFailures = false;
-        var savedPos3 = pos;
-        var result12 = parse_textElement();
-        var result13 = result12 !== null
-          ? (function(contentString) { return [contentString]; })(result12)
+        var savedPos4 = pos;
+        var result15 = parse_textElement();
+        var result16 = result15 !== null
+          ? (function(contentString) { return [contentString]; })(result15)
           : null;
-        if (result13 !== null) {
-          var result11 = result13;
+        if (result16 !== null) {
+          var result14 = result16;
         } else {
-          var result11 = null;
-          pos = savedPos3;
+          var result14 = null;
+          pos = savedPos4;
         }
-        if (result11 !== null) {
-          var result0 = result11;
+        if (result14 !== null) {
+          var result0 = result14;
         } else {
-          var savedPos1 = pos;
-          var savedPos2 = pos;
-          if (input.substr(pos, 1) === "{") {
-            var result7 = "{";
+          var savedPos3 = pos;
+          if (input.substr(pos, 1) === ";") {
+            var result12 = ";";
             pos += 1;
           } else {
-            var result7 = null;
+            var result12 = null;
             if (reportMatchFailures) {
-              matchFailed("\"{\"");
+              matchFailed("\";\"");
             }
           }
-          if (result7 !== null) {
-            var result8 = parse_statementList();
-            if (result8 !== null) {
-              if (input.substr(pos, 1) === "}") {
-                var result9 = "}";
-                pos += 1;
-              } else {
-                var result9 = null;
-                if (reportMatchFailures) {
-                  matchFailed("\"}\"");
-                }
+          var result13 = result12 !== null
+            ? (function() { return {}})()
+            : null;
+          if (result13 !== null) {
+            var result11 = result13;
+          } else {
+            var result11 = null;
+            pos = savedPos3;
+          }
+          if (result11 !== null) {
+            var result0 = result11;
+          } else {
+            var savedPos1 = pos;
+            var savedPos2 = pos;
+            if (input.substr(pos, 1) === "{") {
+              var result7 = "{";
+              pos += 1;
+            } else {
+              var result7 = null;
+              if (reportMatchFailures) {
+                matchFailed("\"{\"");
               }
-              if (result9 !== null) {
-                var result10 = parse__();
-                if (result10 !== null) {
-                  var result5 = [result7, result8, result9, result10];
+            }
+            if (result7 !== null) {
+              var result8 = parse_statementList();
+              if (result8 !== null) {
+                if (input.substr(pos, 1) === "}") {
+                  var result9 = "}";
+                  pos += 1;
+                } else {
+                  var result9 = null;
+                  if (reportMatchFailures) {
+                    matchFailed("\"}\"");
+                  }
+                }
+                if (result9 !== null) {
+                  var result10 = parse__();
+                  if (result10 !== null) {
+                    var result5 = [result7, result8, result9, result10];
+                  } else {
+                    var result5 = null;
+                    pos = savedPos2;
+                  }
                 } else {
                   var result5 = null;
                   pos = savedPos2;
@@ -669,47 +695,36 @@ module.exports = (function(){
               var result5 = null;
               pos = savedPos2;
             }
-          } else {
-            var result5 = null;
-            pos = savedPos2;
-          }
-          var result6 = result5 !== null
-            ? (function(children) { 
-                    return children; 
-                })(result5[1])
-            : null;
-          if (result6 !== null) {
-            var result4 = result6;
-          } else {
-            var result4 = null;
-            pos = savedPos1;
-          }
-          if (result4 !== null) {
-            var result0 = result4;
-          } else {
-            var savedPos0 = pos;
-            if (input.substr(pos, 1) === ";") {
-              var result2 = ";";
-              pos += 1;
-            } else {
-              var result2 = null;
-              if (reportMatchFailures) {
-                matchFailed("\";\"");
-              }
-            }
-            var result3 = result2 !== null
-              ? (function() { return {}})()
+            var result6 = result5 !== null
+              ? (function(children) { 
+                      return children; 
+                  })(result5[1])
               : null;
-            if (result3 !== null) {
-              var result1 = result3;
+            if (result6 !== null) {
+              var result4 = result6;
             } else {
-              var result1 = null;
-              pos = savedPos0;
+              var result4 = null;
+              pos = savedPos1;
             }
-            if (result1 !== null) {
-              var result0 = result1;
+            if (result4 !== null) {
+              var result0 = result4;
             } else {
-              var result0 = null;;
+              var savedPos0 = pos;
+              var result2 = parse_statement();
+              var result3 = result2 !== null
+                ? (function(statement) { return [statement] })(result2)
+                : null;
+              if (result3 !== null) {
+                var result1 = result3;
+              } else {
+                var result1 = null;
+                pos = savedPos0;
+              }
+              if (result1 !== null) {
+                var result0 = result1;
+              } else {
+                var result0 = null;;
+              };
             };
           };
         }
@@ -769,7 +784,7 @@ module.exports = (function(){
         
         var savedPos0 = pos;
         var savedPos1 = pos;
-        var result3 = parse_tagIdentLiteral();
+        var result3 = parse_ident();
         if (result3 !== null) {
           var result4 = parse__();
           if (result4 !== null) {
@@ -809,7 +824,7 @@ module.exports = (function(){
           pos = savedPos1;
         }
         var result2 = result1 !== null
-          ? (function(it, ct) { return {type:'decl', name:it, children:ct} })(result1[0], result1[4])
+          ? (function(it, ct) { return {type:'proto', name:it, contents:ct} })(result1[0], result1[4])
           : null;
         if (result2 !== null) {
           var result0 = result2;

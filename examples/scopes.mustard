@@ -1,1 +1,3 @@
 {{artist}} -> :a { "hello" :artist }
+world = { p "world" }  
+world

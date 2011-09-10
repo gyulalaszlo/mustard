@@ -24,26 +24,35 @@ elementDeclaration "element declaration"
     = ident:tagIdentLiteral _ attrs:attributeDeclaration* { return {name: ident, attributes:attrs}; }
     / attrs:attributeDeclaration+ { return {name:{type:"text", text:["div"]}, attributes:attrs} }
 
+
+
 attributeDeclaration "attributes declaration"
     = '#' ident:identLiteral _           { return {name:{type:'text', text:['id']}, value:ident}; }
     / '.' ident:identLiteral _           { return { name:{type:'text', text:['class']}, value:ident}; }
     / '@' ident:identLiteral _ '=' _ value:stringLiteral _  { return {name:ident, value:value};  }
 
 
+
+
 elementContents "element contents"
     = contentString:textElement { return [contentString]; }
+    / ';' { return {}}
     / '{' children:statementList '}' _ { 
         return children; 
     }
-    / ';' { return {}}
+    / statement:statement  { return [statement] }
 
 
 textElement "text"
     = it:stringLiteral { return it; }
 
+
+
 elementPrototype
-    = it:tagIdentLiteral _ '=' _ ct:elementContents 
-        { return {type:'decl', name:it, children:ct} }
+    = it:ident _ '=' _ ct:elementContents 
+        { return {type:'proto', name:it, contents:ct} }
+
+
 
 scopeDeclaration "scope declarations"
    = it:singleInterpolateLiteral  '->' _ params:scopeParamList _

@@ -36,7 +36,7 @@ describe 'templates', ->
         expected =
             'div { p "Hello" }': '<div><p>Hello</p></div>'
             'div .smile { p "Hello" }': '<div class="smile"><p>Hello</p></div>'
-            'div p "hello"': '<div></div><p>hello</p>'
+            'div p "hello"': '<div><p>hello</p></div>'
             'div; p "hello"': '<div></div><p>hello</p>'
 
         check_render_hash expected
@@ -133,6 +133,9 @@ describe 'interpolation', ->
 describe 'declarations', ->
     it 'should render declarations', ->
         check_render_hash
-            'world = "world" "hello" world': 'hello world'
-            'world = { b "world" } "hello" world': 'hello <b>world</b>'
+            'world = "world" "hello " world': 'hello world'
+            'world = b "world" "hello " world': 'hello <b>world</b>'
+            'nav_link =  li.nav_link { a@href="/" "home" } nav_link; nav_link; ':
+                '<li class="nav_link"><a href="/">home</a></li>' +
+                '<li class="nav_link"><a href="/">home</a></li>'
                 
