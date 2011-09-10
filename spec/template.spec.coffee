@@ -52,6 +52,7 @@ describe 'templates', ->
 describe 'interpolation', ->
     
     context =
+        artist_id: 'brixandbones'
         artist: "BrixAndBones"
         title: "(Say my name) I'll Play your game boy"
         id: 'track_07'
@@ -59,44 +60,79 @@ describe 'interpolation', ->
         year: 2011
         track: 2
         element: 'section'
+        formats:
+            portable: 'portable.mp3'
+            hq: 'hq.mp3'
+        
+        key: -> "bb-#{@id}"
+        url: -> "/#{@artist_id}/#{@year}/#{@slug}"
+        files: -> "files/#{val}" for format, val of @formats
 
-    it 'should interpolate strings', ->
-        check_render_hash context,
-            '{{artist}}':'BrixAndBones'
-            '"{{artist}}"':'BrixAndBones'
-            '"by {{artist}}"': 'by BrixAndBones'
-            '"{{title}} by {{artist}}"': "#{context.title} by BrixAndBones"
-            'p {{artist}}': '<p>BrixAndBones</p>'
-            'p.artist {{artist}}': '<p class="artist">BrixAndBones</p>'
+    describe 'attribute interpolation', ->
 
-            'p.combined { span.artist {{artist}} span.song {{title}} }':
-                  '<p class="combined"><span class="artist">BrixAndBones</span><span class="song">' +
-                  context.title + '</span></p>'
+        it 'should interpolate strings', ->
+            check_render_hash context,
+                '{{artist}}':'BrixAndBones'
+                '"{{artist}}"':'BrixAndBones'
+                '"by {{artist}}"': 'by BrixAndBones'
+                '"{{title}} by {{artist}}"': "#{context.title} by BrixAndBones"
+                'p {{artist}}': '<p>BrixAndBones</p>'
+                'p.artist {{artist}}': '<p class="artist">BrixAndBones</p>'
+                'a @href={{url}} #{{key}}': '<a href="'+ context.url() + '" id="bb-track_07"></a>'
 
-
-
-    it 'should interpolate using the shorthand syntax', ->
-        check_render_hash context,
-            ':artist':'BrixAndBones'
-            'p :artist': '<p>BrixAndBones</p>'
-            'p.artist :artist': '<p class="artist">BrixAndBones</p>'
-
-            'p.combined { span.artist :artist span.song :title }':
-                  '<p class="combined"><span class="artist">BrixAndBones</span><span class="song">' +
-                  context.title + '</span></p>'
+                'p.combined { span.artist {{artist}} span.song {{title}} }':
+                      '<p class="combined"><span class="artist">BrixAndBones' +
+                      '</span><span class="song">' +
+                      context.title + '</span></p>'
 
 
-         
-    it 'should interpolate attribtues', ->
-        check_render_hash context,
-            'p.{{slug}}': '<p class="say_my_name"></p>'
-            'p#{{slug}}': '<p id="say_my_name"></p>'
-            'p.year_{{year}} {{year}}': '<p class="year_2011">2011</p>'
-            '.year_{{year}} .sortable {{year}}': '<div class="year_2011 sortable">2011</div>'
 
-    it 'should interpolate element names', ->
-        check_render_hash context,
-            '%{{element}}': '<section></section>'
-            '%{{element}}.{{id}}': '<section class="track_07"></section>'
-            '%{{element}}.{{id}} :slug': '<section class="track_07">say_my_name</section>'
-            
+        it 'should interpolate using the shorthand syntax', ->
+            check_render_hash context,
+                ':artist':'BrixAndBones'
+                'p :artist': '<p>BrixAndBones</p>'
+                'p.artist :artist': '<p class="artist">BrixAndBones</p>'
+
+                'p.combined { span.artist :artist span.song :title }':
+                      '<p class="combined"><span class="artist">BrixAndBones' +
+                      '</span><span class="song">' + context.title + '</span></p>'
+
+
+             
+        it 'should interpolate attribtues', ->
+            check_render_hash context,
+                'p.{{slug}}': '<p class="say_my_name"></p>'
+                'p#{{slug}}': '<p id="say_my_name"></p>'
+                'p.year_{{year}} {{year}}': '<p class="year_2011">2011</p>'
+                '.year_{{year}} .sortable {{year}}': '<div class="year_2011 sortable">2011</div>'
+
+        it 'should interpolate element names', ->
+            check_render_hash context,
+                '%{{element}}': '<section></section>'
+                '%{{element}}.{{id}}': '<section class="track_07"></section>'
+                '%{{element}}.{{id}} :slug': '<section class="track_07">say_my_name</section>'
+                
+    describe 'scopes', ->
+        
+        it 'should key open up object', ->
+            check_render_hash context,
+                ':formats -> :format { {{format.hq}}  }': 'hq.mp3'
+                '{{formats}} -> {{f}} { :f.hq  }': 'hq.mp3'
+                ':formats -> :format { {{format.hq}}  } :format.hq': 'hq.mp3'
+
+        it 'should iterate over keys', ->
+            check_render_hash context,
+                ':formats -> :format, :link { a .{{format}} @href={{link}} }': '<a class="portable" href="portable.mp3"></a><a class="hq" href="hq.mp3"></a>'
+
+        it 'should iterate over arrays', ->
+            check_render_hash context,
+                ':files -> :file { a @href=:file }': '<a href="files/portable.mp3"></a><a href="files/hq.mp3"></a>'
+                ':files -> :file { a @href=:file } p :file': '<a href="files/portable.mp3"></a><a href="files/hq.mp3"></a><p></p>'
+
+
+describe 'declarations', ->
+    it 'should render declarations', ->
+        check_render_hash
+            'world = "world" "hello" world': 'hello world'
+            'world = { b "world" } "hello" world': 'hello <b>world</b>'
+                

@@ -9,11 +9,15 @@ statementList "statement list"
 
 
 statement "element statement"
-    = decl:elementDeclaration _ contents:elementContents? _ 
+    = 
+        proto:elementPrototype _ { return proto }
+    / decl:elementDeclaration _ contents:elementContents? _ 
         { 
             return { type:'element', declaration:decl, contents:contents};
         }
-    / text:textElement { return text }
+    / scope:scopeDeclaration _ { return scope }
+    / text:textElement _ { return text }
+
 
 
 elementDeclaration "element declaration"
@@ -37,13 +41,25 @@ elementContents "element contents"
 textElement "text"
     = it:stringLiteral { return it; }
 
-     
+elementPrototype
+    = it:tagIdentLiteral _ '=' _ ct:elementContents 
+        { return {type:'decl', name:it, children:ct} }
+
+scopeDeclaration "scope declarations"
+   = it:singleInterpolateLiteral  '->' _ params:scopeParamList _
+    '{' children:statementList '}' 
+        { return { type:"scope", name: it, contents:children, parameters:params}}
+
+scopeParamList "scope parameters list"
+   = it:singleInterpolateLiteral ot:(','_ ot:singleInterpolateLiteral {
+return ot})* {
+return [it].concat(ot); } 
+    / { return [] }
 
 stringLiteral "string"
  = '"' '"' _ { return {type:"text", text:[""]}; }
  / '"' st:stringInternal+ '"' _ { return {type:"text", text:st} }
- / it:interpolateInternal _ { return {type:"text", text:[it]}}
- / it:interpolateWholeLiteralInternal _ { return {type:"text", text:[it]}}
+ / it:singleInterpolateLiteral _ { return it }
 
 tagIdentLiteral "tag ident literal (prefixed with '%' if interpolated)"
   = '%' identLiteral:identLiteral { return identLiteral; }
@@ -51,6 +67,12 @@ tagIdentLiteral "tag ident literal (prefixed with '%' if interpolated)"
 
 identLiteral "identifier (normal or interpolated)"
   = id:identInternal+ { return {type:"text", text:id} }
+
+
+singleInterpolateLiteral "single standing interpolation literal"
+  = it:interpolateInternal _ { return {type:"text", text:[it]}}
+ / it:interpolateWholeLiteralInternal _ { return {type:"text", text:[it]}}
+
 
 identInternal
   = it:identChar+ { return it.join(''); }
@@ -63,10 +85,16 @@ stringInternal
     / chr:'{' { return chr }
 
 interpolateInternal
- = '{{' _ id:ident _ '}}' { return {interpolate: id} }
+ /* = '{{' _ id:ident ('.' indent)+ _ '}}' { return {interpolate: id} }*/
+ = '{{' _ id:identChain _ '}}' { return {interpolate: id} }
+ 
 
 interpolateWholeLiteralInternal
- = ':' id:ident { return {interpolate: id} }
+ = ':' id:identChain { return {interpolate: id} }
+
+identChain
+ = id:ident internal:('.' iid:ident { return iid } )* {
+return [id].concat(internal).join('.')}
 
 
 

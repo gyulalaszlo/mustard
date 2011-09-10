@@ -4,7 +4,7 @@ path = require 'path'
 mustard_pegjs = require '../build/mustard_pegjs'
 jsoutput = require './output_js'
 _ = require '../vendor/underscore'
-{IndentedBuffer} = require './indented_buffer'
+{IndentedBuffer, ContextWrapper} = require './indented_buffer'
 
 
 # Exceptions
@@ -32,7 +32,6 @@ class ElementList
     push: (el)-> @elements.push el
     length: ()-> @elements.length
     toString: -> "[elementList #{_.map(@elements, (e)-> e.toString()).join("\n") }]"
-
 
 
 class Element
@@ -73,6 +72,41 @@ class Element
     toString: ()-> "[element <#{@name}> - #{@attributeTexts()} - #{@children}]"
 
 
+class Scope
+    
+    constructor: (hash, @children)->
+        @name = new Text(hash.name)
+        @parameters = []
+        # console.log params
+        @parameters.push new Text(param) for param in hash.parameters
+
+    toString: -> "[scope #{JSON.stringify(@name)} - #{@children}]"
+    hasOnlyTextChildren: -> false
+
+class AstConverter
+    constructor: ->
+    listToAst: (list_in)->
+        res = new ElementList
+        for el in list_in
+            res.push @elementFor(el)
+        res
+
+    getChildrenFor: (obj)->
+        children = new ElementList
+        if obj.contents instanceof Array
+            children = @listToAst(obj.contents)
+        children
+
+    
+    elementFor: (obj)->
+
+        return unless obj instanceof Object
+        
+        return switch obj.type
+            when 'text' then new Text(obj)
+            when 'scope' then new Scope(obj, @getChildrenFor(obj))
+            when 'element' then new Element(obj, @getChildrenFor(obj))
+ 
 
 #
 # Parser
@@ -100,7 +134,7 @@ class Parser
             # result = @_parser.parse contents.toString()
             return result
         catch e
-            throw new MustardSyntaxError(fileName, e.line, e.column, e.message, e) if e.name is "SyntaxError"
+            throw new Error("Cannot parse: #{e.line} #{e.column} -- #{e.message} - #{contents.toString()}") if e.name is "SyntaxError"
 
 
 class Templates
@@ -159,6 +193,7 @@ class MustardCompiler
         # context = {}
 
         result = inst.compile _(opts).defaults MustardCompiler._default_options
+        # console.log result.toString()
         result.toInstance()
 
         
@@ -196,28 +231,7 @@ class CompilationResult
 
 
 
-class AstConverter
-    constructor: ->
-    listToAst: (list_in)->
-        res = new ElementList
-        for el in list_in
-            res.push @elementFor(el)
-        res
-    
-    elementFor: (obj)->
-
-        return unless obj instanceof Object
-        
-        # wtf this needs typeof instead of instanceof is beyond me
-        if obj.type == 'text'
-            return new Text(obj)
-
-        if obj.type == 'element'
-          children = new ElementList
-          if obj.contents instanceof Array
-            children = @listToAst(obj.contents)
-          return new Element(obj, children)
-        
+       
 root = exports ? this
 
 # export checking functions
@@ -225,6 +239,7 @@ root._mustard_checks =
     isElement: (o)-> o instanceof Element
     isElementList: (o)-> o instanceof ElementList
     isText: (o)-> o instanceof Text
+    isScope: (o)-> o instanceof Scope
 
 mustardFunc = (text, opts={})->
     MustardCompiler.create(text, opts)

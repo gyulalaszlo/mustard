@@ -1,6 +1,6 @@
 parser = require './parser'
 _ = require './underscore'
-{IndentedBuffer} = require './indented_buffer'
+{ContextWrapper, IndentedBuffer} = require './indented_buffer'
 
 class JsOutput
 
@@ -35,16 +35,19 @@ class JsOutput
         body = @buffer.join()
         body
 
-    convertElementList: (elementList, wrapperFunctionName=null)->
-        if wrapperFunctionName
-            @buffer.push "function(context) {"
+    convertElementList: (elementList, wrapIntoFunction=false)->
+        if wrapIntoFunction
+            @buffer.push "function(context, output) {"
             @buffer.indent()
-            @buffer.push 'var output = new this.bufferType();'
+            @buffer.push 'var __context; if (output == null) { __context = new __contextWrapper(context); }'
+            @buffer.push 'else { __context = context; }'
+            @buffer.push 'if (output == null) { output = new __bufferType(); }'
+            
         
         for element in elementList.elements
             @convertElement(element)
 
-        if wrapperFunctionName
+        if wrapIntoFunction
             @flushInterpolateBuffer()
             joinChar = if @options.pretty then '\\n' else ''
             @buffer.push 'return output.join("'+joinChar+'");'
@@ -57,15 +60,36 @@ class JsOutput
         @buffer.push "#{method}(#{@buf.toInterpolated()});"
         @buf = new InterpolatedStringBuilder
 
+    convertScope: (el)->
+        @flushInterpolateBuffer()
+        @buffer.push "__context.withScope("
+        abuf = new InterpolatedStringBuilder()
+        @convertToRawText el.name, abuf
+        abuf.pushInterpolation ' output /* buffer */'
+
+        if _(el.parameters).size() > 0
+            paramsBuf = new InterpolatedStringBuilder()
+            for param in el.parameters
+                paramsBuf.pushInterpolation @convertToRawText(param)
+            abuf.pushInterpolation "[#{paramsBuf.toList(', ')}] /* params */,"
+        else
+            abuf.pushInterpolation '[] /* params */,'
+        @buffer.indent abuf.toList()
+        # @buffer.push "], // params"
+        @convertElementList(el.children, true)
+        @buffer.outdent "); // end of scope: #{el.name}"
+
+
     convertElement: (el)->
         needsPretty = !el.hasOnlyTextChildren() and @options.pretty
 
 
-    
+        if parser._mustard_checks.isScope el
+            @convertScope el
+   
         if parser._mustard_checks.isText el #instanceof parser.Text
             @convertText el, @buf
 
-        # if el instanceof parser.Element
         if parser._mustard_checks.isElement el
             buf = new InterpolatedStringBuilder
             buf.pushString "<"
@@ -83,16 +107,11 @@ class JsOutput
                   buf.pushString '\\"'
                 else
                   name_str = name.toInterpolated(false)
-                  # abuf = attribute_buffers[name] ||= new InterpolatedStringBuilder
                   valueBuffer = new InterpolatedStringBuilder
                   @convertText attr.value, valueBuffer
-                  # abuf.pushBuffer valueBuffer
 
                   attribute_buffers[name] ||= []
                   attribute_buffers[name].push valueBuffer
-                  # console.log idx,  attrs.length - 1
-                  # unless (idx is _(attrs).size() - 1)
-                    # abuf.pushString ' '
 
             for key, attr_buf of attribute_buffers
                   buf.pushString " #{key}=\\\""
@@ -137,10 +156,24 @@ class JsOutput
 
             # interpolation partial
             if partial.interpolate
-                o.pushInterpolation "context.#{partial.interpolate}"
+                o.pushInterpolation "__context.get('#{partial.interpolate}')"
         
         return o
 
+    convertToRawText: (text, o=new InterpolatedStringBuilder)->
+
+        for partial in text.partials
+            # text partial
+            if typeof partial is "string"
+                o.pushString partial
+
+            # interpolation partial
+            if partial.interpolate
+                o.pushString partial.interpolate
+        
+        return o.toList()
+
+      
     _: _
 
 
@@ -151,8 +184,8 @@ class JsOutput
     function <%= className %>(){
         // Constructor. empty for now...
     }
-
-    <%= className %>.prototype.bufferType = IndentedBuffer;
+    var __bufferType = IndentedBuffer;
+    var __contextWrapper = ContextWrapper;
 
     <% if (_(template_functions).size() > 1) { %>
 
@@ -222,7 +255,8 @@ class InterpolatedStringBuilder
           @pushString separator_string if separator_string isnt null and i != buf.buffer.length - 1
 
 
-    toInterpolated: (quoteString=true)->
+    toList: (quoteString=true)->
+
       return "" if @buffer.length == 0
 
       unless @hasInterpolation
@@ -240,11 +274,17 @@ class InterpolatedStringBuilder
         else
           lastStringBuf.push e
       o.push '"' + lastStringBuf.join('') + '"'  if lastStringBuf.length > 0
+      return o
 
-      return "[ #{o.join(',')} ].join('')"
+    toInterpolated: (quoteString=true, surroundWithJoin=true)->
+        ret = @toList(quoteString)
+        if typeof ret is 'string'
+            return ret
+        "[ #{ret.join(',')} ].join('')"
 
     toString: -> @toInterpolated(false)
 
 root = exports ? this
 root.JsOutput = JsOutput
-root.IndentedBuffer = IndentedBuffer
+# root.IndentedBuffer = IndentedBuffer
+# root.ContextWrapper = ContextWrapper
