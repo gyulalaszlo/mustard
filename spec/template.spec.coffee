@@ -143,8 +143,11 @@ describe 'declarations', ->
 
 describe 'Debug', ->
     it '...', ->
-        check_render_hash context,
+        embed_context =
+          i:0
+          run: -> @i++; if @i > 3 then return false else true
+        check_render_hash _.clone(embed_context),
             _debug:true
-            'world = "world" "hello " world': 'hello world'
+            'one = { :run -> {  "in one " two } } two = { :run -> { "in two " one } } one': '4'
             # ':formats -> :format { {{format.hq}}  }': 'hq.mp3'
                 

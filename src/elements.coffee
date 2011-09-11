@@ -12,18 +12,68 @@ class AstElement
     templates: -> @_templates
     hasOnlyTextChildren: -> false
 
+    childElements: -> []
+
 class Text extends AstElement
-    constructor: (obj)-> @partials = obj.text
+    constructor: (obj)->
+        @partials = obj.text
+        @_isRawString = true
+        for partial in @partials
+            @_isRawString = true; break if partial.interpolate
+         
+
+    type: -> 'text'
     hasOnlyTextChildren: -> true
+
     toString: -> "[text: #{JSON.stringify _(@partials).map( (e)->JSON.stringify e ).join(' ')}]"
-    toRawString: -> @partials.toString()
+    
+    isRawString: -> @_isRawString
+
+    toRawString: ->
+        return @partials.join('') if @_isRawString
+        (for partial in @partials
+            if partial.interpolate
+                partial.interpolate
+            else
+                partial
+        ).join('')
+
+    toIdString: ->
+        (for p in @partials
+            if p.interpolate then p.interpolate else p
+        ).join('')
+
+    toWildCharString: ->
+        (for p in @partials
+            if p.interpolate then '(.*?)' else p
+        ).join('')
+        # (if p.interpolate then '(.*?)' else p for p in @partials).join('')
+        
+
+    pushToTokenStream: (stream)->
+        for partial in @partials
+            if partial.interpolate
+                if partial.interpolate == 'yield'
+                    stream.pushYield()
+                else
+                    stream.pushInterpolation partial.interpolate
+            else
+                stream.pushString partial
+
+            
 
 
-class ElementList extends AstElement
+class ElementList
     constructor: -> @elements = []
+    type: -> 'elementList'
     push: (el)-> @elements.push el
     length: ()-> @elements.length
     toString: -> "[elementList #{_.map(@elements, (e)-> e.toString()).join("\n") }]"
+    childElements: -> @elements
+
+    pushToTokenStream: (stream)->
+        for child in @elements
+            child.pushToTokenStream(stream)
 
 
 class Element extends AstElement
@@ -46,6 +96,8 @@ class Element extends AstElement
 
         @attributes = attr_cache
 
+    type: 'element'
+
     attributeTexts: ()->
         attributeTexts = []
         for k,v of @attributes
@@ -63,6 +115,14 @@ class Element extends AstElement
         true
 
     toString: ()-> "[element <#{@name}> - #{@attributeTexts()} - #{@children}]"
+    
+    childElements: () -> @children.elements
+
+    pushToTokenStream: (stream)->
+        childStream = stream.pushSymbolStart @name.toWildCharString()
+        @children.pushToTokenStream childStream
+        # stream.pushSymbolEnd()
+         
 
 
 class Scope extends AstElement
@@ -72,8 +132,16 @@ class Scope extends AstElement
         @parameters = []
         # console.log params
         @parameters.push new Text(param) for param in hash.parameters
-
+    
+    type: 'scope'
     toString: -> "[scope #{JSON.stringify(@name)} - #{@children}]"
+    childElements: () -> @children.elements
+    
+    pushToTokenStream: (stream)->
+        stream.pushScopeStart @name.toIdString(), (p.toIdString() for p in @parameters)
+        @children.pushToTokenStream stream
+        stream.pushScopeEnd()
+    
 
 
 
@@ -84,8 +152,14 @@ class ElementPrototype extends AstElement
 
     name: -> @_name
     
+    type: 'proto'
     toString: -> "[proto #{@_name} - #{@children}]"
+    childElements: () -> @children.elements
 
+    pushToTokenStream: (stream)->
+        # stream.pushSymbolStart @name.toWildCharString()
+        # @children.pushSymbolStart stream
+        # stream.pushSymbolEnd @name.toWildCharString()
 
 
 
@@ -136,7 +210,13 @@ AstElement.isText = (o)-> o instanceof Text
 AstElement.isScope = (o)-> o instanceof Scope
 AstElement.isProto = (o)-> o instanceof ElementPrototype
 
-
+AstElement.each = (el, fun, onClose=false)->
+    fun(el, true)
+    AstElement.each(c, fun) for c in el.childElements()
+    fun(el, false) if onClose
+    # if 
+    
+AstElement.eachWithClosing = (el, fun)-> AstElement.each(el, fun, true)
 
 # export checking functions
 root._mustard_checks = AstElement
