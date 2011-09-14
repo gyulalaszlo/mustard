@@ -47,11 +47,17 @@ class DependencyResolver
             # if _(sym.dependencies()).size() == 1
             resolved_deps = []
             for dep, resolved of sym.dependencies()
-                console.log "DEP OF #{name} -> #{dep}"
-                resolved_dep = @_symbols.get dep
-                sym.tokens().yieldDependency resolved_dep
-                resolved_deps.push dep
-            
+                unless sym.isResolving()
+                # if resolved is true
+                    # sym.dependencies()[dep] = false
+                    sym.isResolving true
+                    console.log "resolving DEP OF #{name} -> #{dep}"
+                    resolved_dep = @_symbols.get dep
+                    sym.tokens().yieldDependency resolved_dep
+                    resolved_deps.push dep
+                
+                sym.isResolving false
+                
             
             delete sym.dependencies()[dep] for dep in resolved_deps
                 
@@ -68,14 +74,24 @@ class DependencyResolver
 
 class TokenStream
 
-    constructor: (@_parent=null)->
+    constructor: (@_parent=null, symbol=null)->
         @_tokens = []
         @_scopes = []
         @_symbols = []
         @_dependencies = {}
+        # console.log symbol
+        if @_parent and @_parent._isTokenStream
+            @_symbol = @_parent.sym()
+        else
+            @_symbol = symbol
+
+
+    sym: -> @_symbol
 
     _push: (token)->
         @_tokens.push token
+
+    _isTokenStream: true
 
     tokens: -> @_tokens
 
@@ -125,12 +141,13 @@ class TokenStream
             t = out_tokens[idx]
 
             if t.type is 'symbol'
-                console.log "yieldDependency for #{symbol_name}  INTO:#{t.name}"
+                # if symbol_name isnt t.name
+                console.log "yieldDependency for #{@sym().name()} #{symbol_name}  INTO:#{t.name}"
                 t.stream.yieldDependency(symbol)
                 console.log "/yieldDependency"
 
                 if t.name is symbol_name
-                    tokens = symbol.tokens().yield( t.stream.tokens() )
+                    tokens = symbol.yieldTokens( t.stream )
                     # console.log t.
                     out_tokens[idx..idx] = tokens
             
@@ -168,16 +185,21 @@ class TokenStream
             switch t.type
                 when 'string' then t.data
                 when 'interpolation' then __wrapPart t.data, green
+                # when 'reference' then __wrapPart "<ref:#{t.name} #{t.stream.toColorString()}>", cyan
                 when 'scope' then  __wrapPart "<scope:#{t.name} #{t.params}>", red
                 when '/scope' then  __wrapPart "</scope:#{t.name} #{t.params}>", red
                 when 'symbol'
                     (__wrapPart "<symbol:#{t.name}> ", cyan) +
                     t.stream.toColorString() +
                     (__wrapPart "</symbol:#{t.name}> ", cyan)
+                when 'reference'
+                    (__wrapPart "<ref:#{t.name}> ", cyan) +
+                    t.stream.toColorString() +
+                    (__wrapPart "</ref:#{t.name}> ", cyan)
                 when 'yield' then  __wrapPart "YIELD", purple
         ).join __wrapPart(',')
 
-    $meta(@, true, __filename)
+    # $meta(@, true, __filename)
     # @$meta.attr('name').attr('dependencies')
 
     # @$meta.traceCalling 'addDependency'
@@ -534,7 +556,7 @@ class ProtoSymbolTable
         # console.log "resolve", resolver
 
 
-    toString: -> ['<--'].concat((v.toString() for k,v of @_symbols).concat('-->')).join " --\n"
+    toString: -> (v.toString() for k,v of @_symbols).join " --\n"
             
         
 
@@ -548,9 +570,11 @@ class ProtoSymbolProxy
 
 class ProtoSymbol
     constructor:(@_name, elements)->
-        @_tokens = new TokenStream
+        @_tokens = new TokenStream null, this
         elements.pushToTokenStream @_tokens
+        @_isResolving = false
         
+    
 
     isProxy: -> false
     name: -> @_name
@@ -559,7 +583,28 @@ class ProtoSymbol
 
     toString: ->
         # console.log @
-        "SYMBOL: #{@_name} -> [ #{JSON.stringify(@_tokens.dependencies())} ]\n #{ @_tokens.toColorString()}"
+        "SYMBOL: #{@_name} -> #{JSON.stringify(@_tokens.dependencies())}  #{ @_tokens.toColorString()}"
+    
+    $meta( @, true )
+    @$meta.attr 'isResolving',
+        setter: (e)->  @_isResolving = e; console.log "setting isResolving to #{e}"
+
+
+    yieldTokens: (stream)->
+        return [{type: 'reference', name:@_name, stream:stream}] if @_isResolving
+        idx = 0
+        out_tokens = _(@_tokens.tokens()).toArray()
+        while idx <  out_tokens.length
+            t = out_tokens[idx]
+            if t
+                console.log this, idx, out_tokens if typeof t is 'undefined'
+                if t.type is 'symbol'
+                    t.stream.yield(stream.tokens())
+
+                if t.type is 'yield'
+                    out_tokens[idx..idx] = stream.tokens()
+            idx++
+        return out_tokens
 
 
 
