@@ -74,7 +74,7 @@ class DependencyResolver
 
 class TokenStream
 
-    constructor: (@_parent=null, symbol=null)->
+    constructor: (@_parent=null, symbol=null, attributes={}, interpolated_attributes=[])->
         @_tokens = []
         @_scopes = []
         @_symbols = []
@@ -105,16 +105,17 @@ class TokenStream
     pushInterpolation: (interpolate_key)->
         @_push type: "interpolation", data: interpolate_key
 
-    pushSymbolStart: (symbol_name)->
-        newStream = new TokenStream this
+    pushSymbolStart: (symbol_name, attributes, interpolated_attributes)->
+        newStream = new TokenStream this, attributes, interpolated_attributes
         @addDependency(symbol_name)
         sym = type: "symbol", name: symbol_name, stream:newStream
         @_push sym
         sym.stream
 
 
-    pushYield: ()->
-        @_push type: 'yield'
+    pushYield: ()-> @_push type: 'yield'
+    pushYieldAttribute: (name)-> @_push type: 'yieldAttribute', name: name
+
 
     pushScopeStart: (scope_name, params)->
         scope = { name:scope_name, params:params }
@@ -134,7 +135,6 @@ class TokenStream
 
     yieldDependency: (symbol)->
         symbol_name = symbol.name()
-        # for t in @_tokens
         idx = 0
         out_tokens = _(@_tokens).toArray()
         while idx <  out_tokens.length
@@ -197,13 +197,9 @@ class TokenStream
                     t.stream.toColorString() +
                     (__wrapPart "</ref:#{t.name}> ", cyan)
                 when 'yield' then  __wrapPart "YIELD", purple
+                when 'yieldAttribute' then  __wrapPart "ATTR #{t.name}", purple
         ).join __wrapPart(',')
 
-    # $meta(@, true, __filename)
-    # @$meta.attr('name').attr('dependencies')
-
-    # @$meta.traceCalling 'addDependency'
-    # @$meta.traceCalling 'pushScopeEnd'
 
 
 class JsOutput
@@ -213,9 +209,7 @@ class JsOutput
     
 
     _addTemplate: (elementList, name, opts={})->
-        # symbol = @_symbols.addFromTemplate( name, elementList )
         @_tokenStream = new TokenStream name
-        # @_tokenStream = symbol.tokens() # new TokenStream name
 
         @options = _(opts).defaults
             pretty: true
@@ -237,7 +231,6 @@ class JsOutput
 
         for key, symbol of @_symbols.all()
             @_symbols.addFromTemplate( key, symbol.template() )
-            # console.log @_symbols.all(), symbol
             @_addTemplate symbol.template(), key, options
             
 

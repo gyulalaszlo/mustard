@@ -47,16 +47,19 @@ class Text extends AstElement
         (for p in @partials
             if p.interpolate then '(.*?)' else p
         ).join('')
-        # (if p.interpolate then '(.*?)' else p for p in @partials).join('')
         
 
     pushToTokenStream: (stream)->
         for partial in @partials
-            if partial.interpolate
-                if partial.interpolate == 'yield'
-                    stream.pushYield()
-                else
-                    stream.pushInterpolation partial.interpolate
+            if partial.attribute_interpolate
+                  console.log "=========>>>> #{partial.attribute_interpolate}"
+                  stream.pushYieldAttribute partial.attribute_interpolate
+                
+            else if partial.interpolate
+                # console.log partial.interpolate.substring(0)
+                switch partial.interpolate
+                  when 'yield' then stream.pushYield()
+                  else stream.pushInterpolation partial.interpolate
             else
                 stream.pushString partial
 
@@ -119,7 +122,7 @@ class Element extends AstElement
     childElements: () -> @children.elements
 
     pushToTokenStream: (stream)->
-        childStream = stream.pushSymbolStart @name.toWildCharString()
+        childStream = stream.pushSymbolStart @name.toWildCharString(), @attributes, @interpolated_attributes
         @children.pushToTokenStream childStream
         # stream.pushSymbolEnd()
          

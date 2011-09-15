@@ -96,6 +96,7 @@ stringInternal
 interpolateInternal
  /* = '{{' _ id:ident ('.' indent)+ _ '}}' { return {interpolate: id} }*/
  = '{{' _ id:identChain _ '}}' { return {interpolate: id} }
+ / '{{' _ '@' id:ident _ '}}' { return {attribute_interpolate: id} }
  
 
 interpolateWholeLiteralInternal

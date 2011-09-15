@@ -22,7 +22,7 @@ describe 'Debug', ->
         common_source = (str)-> """
             ul = { "<ul>" :yield  "</ul>" }
             li = { "<li>" :yield  "</li>" li { "blank" } }
-            nav = { :yield ul { :products -> :p { li :p.name } }}
+            nav = { :yield  ul { :products -> :p { {{@class}} li :p.name } }}
             
             para = { "<p>" :yield "</p>" }
             bold = { "<b>" :yield "</b>" }
@@ -37,8 +37,8 @@ describe 'Debug', ->
 
         with_common_source
             # _debug:true
-            'bold_para "bold paragraph" ':
-                """<p><b>bold paragraph</b></p>"""
+            # 'bold_para "bold paragraph" ':
+                # """<p><b>bold paragraph</b></p>"""
 
             ' nav "Hi!"': ''
                 
