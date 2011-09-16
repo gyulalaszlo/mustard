@@ -122,7 +122,18 @@ class Element extends AstElement
     childElements: () -> @children.elements
 
     pushToTokenStream: (stream)->
+
+        
         childStream = stream.pushSymbolStart @name.toWildCharString(), @attributes, @interpolated_attributes
+        console.log @interpolated_attributes
+        for attribute in @interpolated_attributes
+          
+          attr_stream = childStream.pushSymbolAttribute attribute.name.toRawString()
+          attr_stream.pushEl attribute.value
+          # for attribute_part in attribute
+          #   console.log name, attribute_part
+          #   attr_stream.push attribute_part
+
         @children.pushToTokenStream childStream
         # stream.pushSymbolEnd()
          

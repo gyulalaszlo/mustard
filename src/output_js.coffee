@@ -12,6 +12,7 @@ cyan = '\033[0;36m'
 red   = '\033[0;31m'
 green = '\033[0;32m'
 reset = '\033[0m'
+yellow= '\033[1;33m'
 
 # To include blue text in the prompt:
 
@@ -74,7 +75,7 @@ class DependencyResolver
 
 class TokenStream
 
-    constructor: (@_parent=null, symbol=null, attributes={}, interpolated_attributes=[])->
+    constructor: (@_parent=null, symbol=null, @attributes={}, @interpolated_attributes=[])->
         @_tokens = []
         @_scopes = []
         @_symbols = []
@@ -96,6 +97,8 @@ class TokenStream
     tokens: -> @_tokens
 
     # name: -> @_name
+    #
+    pushEl: (el)-> el.pushToTokenStream this
 
     symbols: (name)-> _(@_tokens).filter (el)-> el.type is 'symbol' and el.name is name
     
@@ -105,16 +108,25 @@ class TokenStream
     pushInterpolation: (interpolate_key)->
         @_push type: "interpolation", data: interpolate_key
 
-    pushSymbolStart: (symbol_name, attributes, interpolated_attributes)->
-        newStream = new TokenStream this, attributes, interpolated_attributes
+    pushSymbolStart: (symbol_name)->
+        newStream = new TokenStream this
         @addDependency(symbol_name)
         sym = type: "symbol", name: symbol_name, stream:newStream
         @_push sym
         sym.stream
 
+    pushSymbolAttribute: (attr_name)->
+        newStream = new TokenStream this
+        sym = type: "symbol:attr", name:attr_name, stream:newStream
+        @_push sym
+        sym.stream
+        # @addDependency(symbol_name)
+        
+        
+
 
     pushYield: ()-> @_push type: 'yield'
-    pushYieldAttribute: (name)-> @_push type: 'yieldAttribute', name: name
+    pushYieldAttribute: (name)-> @_push type: 'yield:attr', name: name
 
 
     pushScopeStart: (scope_name, params)->
@@ -134,39 +146,114 @@ class TokenStream
 
 
     yieldDependency: (symbol)->
+        # @yield
         symbol_name = symbol.name()
         idx = 0
         out_tokens = _(@_tokens).toArray()
         while idx <  out_tokens.length
             t = out_tokens[idx]
 
+            unless t then idx++; continue
+
             if t.type is 'symbol'
-                # if symbol_name isnt t.name
-                console.log "yieldDependency for #{@sym().name()} #{symbol_name}  INTO:#{t.name}"
+                # extract the attributes from the start of the symbol instantiation
+                attrs = @extract_attributes_from_tokens( t.stream._tokens )
+
+                # first update the inner child nodes
                 t.stream.yieldDependency(symbol)
-                console.log "/yieldDependency"
 
                 if t.name is symbol_name
-                    tokens = symbol.yieldTokens( t.stream )
-                    # console.log t.
+                    tokens = symbol.yieldTokens( t.stream, attrs )
                     out_tokens[idx..idx] = tokens
+
+            if t.type is 'symbol:attr'
+                out_tokens[idx] = null
             
             idx++
         @_tokens = out_tokens
 
-          
+    # yieldSymbol: (symbol)->
+    #     return [{type: 'reference', name:symbol._name, stream:this}] if symbol._isResolving
+    #     idx = 0
+    #     out_tokens = _(@_tokens).toArray()
+    #     while idx <  out_tokens.length
+    #         t = out_tokens[idx]
+    #         if t
+    #             if t.type is 'symbol'
+    #                 t.stream.yield(@_tokens)
 
-    yield: (tokens)->
+    #             if t.type is 'yield'
+    #                 out_tokens[idx..idx] = @_tokens
+    #         idx++
+    #     return out_tokens
+    
+    extract_attributes_from_tokens: (tokens)->
+        attrs = {}
+        for t in tokens
+          if t
+            # console.log "==>>>> #{t.type} #{t.name}"
+            if t.type is 'symbol:attr'
+                console.log "=EXTRACT:=#{t.name}=>>>> #{t.type} #{t.name}"
+                attrs[t.name] = t.stream
+
+        attrs
+
+
+
+
+    yield: (tokens, attrs)->
         idx = 0
         out_tokens = _(@_tokens).toArray()
+        tokens_dup = tokens
+
+        # unless attrs
+        #   attrs = {}
+        #   # get the attributes from the wrapped stream
+        #   tokens_dup = _(tokens).toArray()
+        #   while idx <  tokens_dup.length
+        #       t = out_tokens[idx]
+        #       unless t then idx++; continue
+        #       console.log "===>>>> #{t.type} #{t.name}"
+        #       if t and (t.type is 'symbol:attr')
+        #           attrs[t.name] = t.stream
+        #           tokens_dup[idx] = null
+
+        #       idx++
+
+
+          # for t in tokens
+          #     if t and (t.type is 'symbol:attr')
+          #         attrs[t.name] = t.stream
+
+
+
         while idx <  out_tokens.length
             t = out_tokens[idx]
-            if t.type is 'symbol'
-                t.stream.yield(tokens)
+
+            unless t then idx++; continue
+
+            if t.type is 'symbol' # and t.name is symbol_name
+                t.stream.yield(tokens_dup, attrs)
+
+            if t.type is 'yield:attr'
+                if attrs[t.name]
+                  console.log "----------------------- yield yield:attr #{t.name}"
+                  out_tokens[idx..idx] = attrs[t.name].tokens()
+                else
+                  console.log "----------------------- remove yield:attr #{t.name}"
+                  out_tokens[idx] = null
+ 
+            if t.type is 'symbol:attr'
+                # attrs[t.name] = t.stream\
+                out_tokens[idx] = null
+
+
+
             if t.type is 'yield'
                 out_tokens[idx..idx] = tokens
 
             idx++
+
         return out_tokens
 
 
@@ -182,6 +269,7 @@ class TokenStream
     toColorString: ->
         ["tokens:"]
         .concat(for t in @_tokens
+            continue unless t
             switch t.type
                 when 'string' then t.data
                 when 'interpolation' then __wrapPart t.data, green
@@ -192,12 +280,17 @@ class TokenStream
                     (__wrapPart "<symbol:#{t.name}> ", cyan) +
                     t.stream.toColorString() +
                     (__wrapPart "</symbol:#{t.name}> ", cyan)
+                when 'symbol:attr'
+                    (__wrapPart "<symbol:attr:#{t.name}> ", cyan) +
+                    t.stream.toColorString() +
+                    (__wrapPart "</symbol:attr#{t.name}> ", cyan)
                 when 'reference'
                     (__wrapPart "<ref:#{t.name}> ", cyan) +
                     t.stream.toColorString() +
                     (__wrapPart "</ref:#{t.name}> ", cyan)
                 when 'yield' then  __wrapPart "YIELD", purple
-                when 'yieldAttribute' then  __wrapPart "ATTR #{t.name}", purple
+                when 'yield:attr' then  __wrapPart "ATTR #{t.name}", purple
+                else __wrapPart "UNKNOWN:#{t}", yellow
         ).join __wrapPart(',')
 
 
@@ -579,25 +672,24 @@ class ProtoSymbol
         "SYMBOL: #{@_name} -> #{JSON.stringify(@_tokens.dependencies())}  #{ @_tokens.toColorString()}"
     
     $meta( @, true )
-    @$meta.attr 'isResolving',
-        setter: (e)->  @_isResolving = e; console.log "setting isResolving to #{e}"
+    @$meta.attr 'isResolving'
 
 
-    yieldTokens: (stream)->
+    yieldTokens: (stream, attrs)->
         return [{type: 'reference', name:@_name, stream:stream}] if @_isResolving
-        idx = 0
-        out_tokens = _(@_tokens.tokens()).toArray()
-        while idx <  out_tokens.length
-            t = out_tokens[idx]
-            if t
-                console.log this, idx, out_tokens if typeof t is 'undefined'
-                if t.type is 'symbol'
-                    t.stream.yield(stream.tokens())
+        @_tokens.yield( stream.tokens(), attrs )
+        # idx = 0
+        # out_tokens = _(@_tokens.tokens()).toArray()
+        # while idx <  out_tokens.length
+        #     t = out_tokens[idx]
+        #     if t
+        #         if t.type is 'symbol'
+        #             t.stream.yield(stream.tokens())
 
-                if t.type is 'yield'
-                    out_tokens[idx..idx] = stream.tokens()
-            idx++
-        return out_tokens
+        #         if t.type is 'yield'
+        #             out_tokens[idx..idx] = stream.tokens()
+        #     idx++
+        # return out_tokens
 
 
 

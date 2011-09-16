@@ -2,8 +2,16 @@ _ = require '../../vendor/underscore'
 {Mustard} = require '../../src/parser'
 
 check_render = (input, output, context={}, debug=false) ->
-    tpl = Mustard input, pretty:false, debug:debug
-    expect( tpl.render(context) ).toEqual(output)
+    try
+      tpl = Mustard input, pretty:false, debug:debug
+      expect( tpl.render(context) ).toEqual(output)
+    catch e
+      if e.stack == undefined
+        console.log e
+        console.log e.message
+        expect( 'Jasmine' ).toEqual( 'exception failed' )
+      else
+        throw e
 
 check_render_hash = (context, expected)->
     [context, expected] = [{}, context ] unless expected
@@ -19,14 +27,19 @@ describe 'Debug', ->
           run: -> @i++; if @i > 3 then return false else true
           products: [{ name: "LP" }, { name: "CD" }, { name: "mp3" }]
             
-        common_source = (str)-> """
-            ul = { "<ul>" :yield  "</ul>" }
-            li = { "<li>" :yield  "</li>" li { "blank" } }
-            nav = { :yield  ul { :products -> :p { {{@class}} li :p.name } }}
+        # common_source = (str)-> """
+        #     ul = { "<ul>" :yield  "</ul>" }
+        #     li = { "<li>" :yield  "</li>" li "" }
+        #     nav = { :yield  ul { :products -> :p { {{@class}} li :p.name } }}
             
-            para = { "<p>" :yield "</p>" }
-            bold = { "<b>" :yield "</b>" }
-            bold_para = para { bold {{yield}} }
+        #     para = { "<p class='{{ @class }}'>" :yield "</p>" }
+        #     bold = { "<b>" :yield "</b>" }
+        #     bold_para = { {{@class}} para { bold {{yield}} } }
+        # """ + "\n" + str
+
+        common_source = (str)-> """
+        p = { "<p class=\"{{ yield }}\">" :yield"</p>" }
+        nav = { p.p{{@class}} "para" :yield }
         """ + "\n" + str
 
         with_common_source = (attrs)->
@@ -37,9 +50,9 @@ describe 'Debug', ->
 
         with_common_source
             # _debug:true
-            # 'bold_para "bold paragraph" ':
-                # """<p><b>bold paragraph</b></p>"""
+            # 'bold_para.bold "bold paragraph" ':
+            #     """<p><b>bold paragraph</b></p>"""
 
-            ' nav "Hi!"': ''
+            ' nav.hi "Hi!"': ''
                 
                
