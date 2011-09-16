@@ -14,6 +14,8 @@ class Meta
             when 'function' then func
         this
 
+
+
     wrapMethod: (name, func, chainThis=true)->
         old_func = @klass.prototype[name]
         backup_name = _.uniqueId "__wrapped_#{name}"
@@ -81,6 +83,23 @@ class Meta
         })
     """
 
+    # @namespace = (target, name, block) ->
+    #   [target, name, block] = [(if typeof exports isnt 'undefined' then exports else window), arguments...] if arguments.length < 3
+    #   top    = target
+    #   target = target[item] or= {} for item in name.split '.'
+    #   block target, top
+
+    # @exports = (context, namespace='', klasses=[])->
+    #   top    = context
+    #   context = context[item] or= {} for item in namespace.split '.'
+
+    #   for fun in klasses
+    #     throw new Error("Only named functions can be exported with $meta") unless fun.name
+    #     context[ fun.name ] = fun
+    #     # console.log k
+    #     # context[k] = v
+
+
 __avaible_metas = {}
 $meta = (target, addToKlass=false, filepath=null)->
     return target.$meta if target.$meta
@@ -92,7 +111,24 @@ $meta = (target, addToKlass=false, filepath=null)->
     meta
 
 $meta.caller = (args)-> console.log args.callee.caller.toString()
-# $meta.of = (target_instance)-> 
+# $meta.namespace = Meta.namespace
+# $meta.exports = Meta.exports
+# # $meta.of = (target_instance)-> 
 
+#
 root = exports ? this
+
+# module = (name) ->
+# $meta.module = (module_name, context, func)->
+#   calling_scope = args.callee.caller
+#   parent = context
+#   for part in module_name.split('.')
+#     parent[part] = parent[part] or {}
+#     parent = parent[part]
+
+#   parent
+
+
+
+# root = exports ? this
 root.$meta = $meta
