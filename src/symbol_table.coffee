@@ -24,9 +24,11 @@ class YieldToken extends Token
  
 
 class YieldAttrToken extends Token
-  constructor: (attrName)-> super 'yield:attr', name:attrName, false
+  constructor: (attrName)->
+    super 'yield:attr', name:attrName, false
+
   name: -> @_attributes.name
-  _dup: -> new YieldAttrToken
+  _dup: -> new YieldAttrToken @name()
  
 
 
@@ -53,9 +55,16 @@ class Symbol extends TokenStream
     (k for k, _ of deps).sort()
 
 
-  yield: (innerTokens)->
+  yield: (innerTokens, attributesTokens={})->
     out_tokens = @duplicate()
     out_tokens.replaceRecursive('yield', {}, innerTokens)
+
+    # console.log attributesTokens
+    # replace the attribute tokens
+    for name, children of attributesTokens
+      out_tokens.replaceRecursive 'yield:attr', {name: name}, children
+      
+
     out_tokens
 
 
@@ -103,7 +112,7 @@ class SymbolTable
 
       # replace symbol calls
       symbol.replaceRecursive 'symbol', {name: depName}, (t)->
-        dependency.yield( t.children().tokens() ).tokens()
+        dependency.yield( t.children().tokens(), t.childrenHash() ).tokens()
         # dependency.tokens()
 
       # do we have any more dependencies?

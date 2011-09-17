@@ -1,4 +1,4 @@
-{mustard:{Symbol, SymbolTable, TextToken, YieldToken, SymbolCallToken}} = require '../src/symbol_table'
+{mustard:{Symbol, SymbolTable, TextToken, YieldAttrToken, YieldToken, SymbolCallToken}} = require '../src/symbol_table'
 
 _pushChildren = (s, children)->
   stream = if s.children then s.children() else s
@@ -13,6 +13,14 @@ yield_ = -> new YieldToken
 yieldattr_ = (name)-> new YieldAttrToken(name)
 txt_ = (txt)-> new TextToken(txt)
 symcall_ = (name, children...)-> _pushChildren new SymbolCallToken(name), children
+
+symcallparam_ = (name, attributes, children...)->
+  sct =  new SymbolCallToken(name)
+  _pushChildren sct, children
+  for k, v of attributes
+    _pushChildren sct.children(k), v
+  sct
+
 sym_ = (name, children...)-> _pushChildren new Symbol(name), children
 
 to_text= (s)->
@@ -20,7 +28,7 @@ to_text= (s)->
   s.eachToken true, (t)->
     o.push switch t.type()
       when 'text' then t.contents()
-      when 'symbol' then "SYM:#{t.name}:#{to_text t}"
+      when 'symbol' then "SYM:#{t.name()}:#{to_text t}"
       when 'yield' then "YIELD"
       when 'yield:attr' then "YIELD:ATTR:#{t.name()}"
   
@@ -118,10 +126,27 @@ describe 'SymbolTable', ->
 
     it 'should resolve attribute yields', ->
       st.add sym_( 'a', "<a href='", yieldattr_('href'), "'>", yield_(), "</a>" )
-      st.add sym_( 'link', symcall_('a'))
+      st.add sym_( 'link', symcallparam_('a', href:['/']))
 
-      expectResolved st, 'link', "<a href=',YIELD:ATTR:href,'>,YIELD,</a>"
+      expectResolved st, 'a', "<a href=',YIELD:ATTR:href,'>,YIELD,</a>"
+      expectResolved st, 'link', "<a href=',/,'>,</a>"
 
+
+    it 'should resolve nested attributes', ->
+      st.add sym_( 'a', "<a class='", yieldattr_('class'), "' href='", yieldattr_('href'), "'>", yield_(), "</a>" )
+      st.add sym_( 'p', "<p class='", yieldattr_('class'), "'>", yield_(), "</p>" )
+      st.add(
+        sym_( 'linkp',
+          symcallparam_('p', class:['para'],
+            symcallparam_('a', class:['link'], href:['/'], "hello" )
+          )
+        )
+      )
+
+      expectResolved st, 'linkp', "<p class=',para,'>,<a class=',link,' href=',/,'>,hello,</a>,</p>"
+      expectResolved st, 'a', "<a class=',YIELD:ATTR:class,' href=',YIELD:ATTR:href,'>,YIELD,</a>"
+      expectResolved st, 'p', "<p class=',YIELD:ATTR:class,'>,YIELD,</p>"
+      
 
 
 

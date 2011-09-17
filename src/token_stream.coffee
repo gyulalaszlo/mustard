@@ -10,7 +10,7 @@ class Token
     # We use a hash because attributes can also be considered children.
     if @_hasChildren
       @_children = {}
-      @_children[ Token.children ] = new TokenStream
+      # @_children[ Token.children ] = new TokenStream
 
   attributes: -> @_attributes
   hasChildren: -> @_hasChildren
@@ -18,8 +18,12 @@ class Token
 
   toString: -> "#{@_type}=>#{JSON.stringify @_attributes}"
 
+  
+  childrenHash: -> @_children
+
   # get the child token stream (or null if hasChildren is false)
-  children: (child_key=Token.children)-> @_children[child_key]
+  children: (child_key=Token.children)-> 
+    @_children[child_key] ||= new TokenStream
 
   matchesFilter: (filterObject)->
     # check the fields
