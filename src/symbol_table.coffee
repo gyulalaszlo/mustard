@@ -95,7 +95,6 @@ class AttrScopeToken extends Token
 
             # add the children stream
             if t.name() is params[1]
-              console.log "attibute strteam:", attribute
               out.pushStream attribute
               return
 
@@ -142,11 +141,12 @@ class Symbol extends TokenStream
 
     # console.log attributesTokens
     # replace the attribute tokens
+    out_tokens.replaceRecursive 'scope:attr', {}, (t)->
+      t.resolve attributesTokens
+
     for name, children of attributesTokens
       out_tokens.replaceRecursive 'yield:attr', {name: name}, children
       
-    out_tokens.replaceRecursive 'scope:attr', {}, (t)->
-      t.resolve attributesTokens
 
     out_tokens
 

@@ -36,6 +36,7 @@ to_text= (s)->
       when 'symbol' then "SYM:#{t.name()}:#{to_text t}"
       when 'yield' then "YIELD"
       when 'yield:attr' then "YIELD:ATTR:#{t.name()}"
+      else "UNKNOWN:#{t}"
   
   o.join(',')
 
@@ -152,17 +153,38 @@ describe 'SymbolTable', ->
       expectResolved st, 'a', "<a class=',YIELD:ATTR:class,' href=',YIELD:ATTR:href,'>,YIELD,</a>"
       expectResolved st, 'p', "<p class=',YIELD:ATTR:class,'>,YIELD,</p>"
       
+    
+    describe 'attribute scope resolving', ->
 
-
-    it 'should resolve attribute scopes', ->
-      st.add(
-        sym_('a', "<a",
-          attrscope_('', ['name', 'value'], ' ', intp_('name'), "='", intp_('value'), "'" ),
-          '>', yield_(), '</a>'
+      beforeEach ->
+        st.add(
+          sym_('a', "<a",
+            attrscope_('', ['name', 'value'], ' ', intp_('name'), "='", intp_('value'), "'" ),
+            '>', yield_(), '</a>'
+          )
         )
-      )
-      st.add( sym_('link', symcallparam_('a', class:['link'], href:['/'], target:['_blank'], "hello")))
+ 
 
-      expectResolved st, 'link',
-        "<a, ,class,=',link,', ,href,=',/,', ,target,=',_blank,',>,hello,</a>"
+      it 'should resolve attribute scopes', ->
+        st.add( sym_('link', symcallparam_('a', class:['link'], href:['/'], target:['_blank'], "hello")))
+        expectResolved st, 'link',
+          "<a, ,class,=',link,', ,href,=',/,', ,target,=',_blank,',>,hello,</a>"
+    
+
+      it 'should resolve nested attribute yields', ->
+        st.add(
+          sym_('div', "<div",
+            attrscope_('class', [], " class='", yieldattr_('class'), "'" ),
+            '>',
+            symcallparam_( 'a', class:[ yieldattr_('a_class') ])
+            yield_(), '</div>'
+          )
+        )
+
+        st.add( sym_('divlink',
+          symcallparam_('div', class:['a_div'], a_class:['linkage'], href:['/'], target:['_blank'], 'hello' ),
+        ))
+
+        expectResolved st, 'divlink',
+          "<div, class=',a_div,',>,<a, ,class,=',linkage,', ,href,=',/,', ,target,=',_blank,',>,hello,</a></div>"
 
