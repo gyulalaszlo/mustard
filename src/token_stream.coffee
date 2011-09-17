@@ -19,7 +19,8 @@ class Token
   toString: -> "#{@_type}=>#{JSON.stringify @_attributes}"
 
   
-  childrenHash: -> @_children
+  # Return the hash containing all the children
+  allChildren: -> @_children
 
   # get the child token stream (or null if hasChildren is false)
   children: (child_key=Token.children)-> 
@@ -117,8 +118,14 @@ class TokenStream
       
       # Depth-first search, so replace the children first
       if is_recursive and t.hasChildren()
-        t.children().replace tokenType, filterObject, replacement_tokens, is_recursive
+        # t.children().replace tokenType, filterObject, replacement_tokens, is_recursive
 
+        for name, child of t.allChildren()
+          # console.log "REPLACING OTHE CHANNEL:#{name} -- #{tokenType} ( #{replacement_tokens} ) - ", child.toString()
+          # continue if name is Token.children
+          child.replace tokenType, filterObject, replacement_function, is_recursive
+      
+      console.log t if t.contents == "other_channel"
       continue unless t._type is tokenType
     
       # filter by object

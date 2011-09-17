@@ -55,6 +55,9 @@ class AttrScopeToken extends Token
 
   _dup: -> new AttrScopeToken @name(), @parameters()
 
+
+
+
   resolve: (attributes)->
     # get the object open by the scope 
     obj = if @name() is '' then attributes else attributes[@name()]
@@ -115,6 +118,8 @@ class AttrScopeToken extends Token
 
 
 class Symbol extends TokenStream
+  @debug = false
+
   constructor: (@_name)->
     super()
 
@@ -137,18 +142,30 @@ class Symbol extends TokenStream
 
   yield: (innerTokens, attributesTokens={})->
     out_tokens = @duplicate()
-    out_tokens.replaceRecursive('yield', {}, innerTokens)
+    out_tokens.replaceRecursive 'yield', {}, (t)->
+      innerTokens
 
-    # console.log attributesTokens
-    # replace the attribute tokens
     out_tokens.replaceRecursive 'scope:attr', {}, (t)->
       t.resolve attributesTokens
 
     for name, children of attributesTokens
-      out_tokens.replaceRecursive 'yield:attr', {name: name}, children
+      # console.log("Looking for match for: #{name} in #{}" )if Symbol.debug
+      out_tokens.replaceRecursive 'yield:attr', {name: name}, (t)->
+        # console.log("Found match: #{name} -- #{t}") if Symbol.debug
+        children
+
+    
       
 
     out_tokens
+
+
+
+  yieldWith: (symbolCall)->
+    # out_tokens = @duplicate()
+    callerContents = symbolCall.children().tokens()
+    callerAttributes = symbolCall.allChildren()
+    @yield( callerContents, callerAttributes )
 
 
     
@@ -195,7 +212,8 @@ class SymbolTable
 
       # replace symbol calls
       symbol.replaceRecursive 'symbol', {name: depName}, (t)->
-        dependency.yield( t.children().tokens(), t.childrenHash() ).tokens()
+        dependency.yieldWith( t )
+        # dependency.yield( t.children().tokens(), t.childrenHash() ).tokens()
         # dependency.tokens()
         #
       

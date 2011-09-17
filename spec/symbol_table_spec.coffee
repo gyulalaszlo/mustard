@@ -1,4 +1,5 @@
 {mustard:{Symbol, SymbolTable, TextToken, YieldAttrToken, YieldToken, InterpolateToken, AttrScopeToken, SymbolCallToken}} = require '../src/symbol_table'
+{mustard:{TokenStream}} = require '../src/token_stream'
 
 _pushChildren = (s, children)->
   stream = if s.children then s.children() else s
@@ -28,15 +29,20 @@ symcallparam_ = (name, attributes, children...)->
 
 sym_ = (name, children...)-> _pushChildren new Symbol(name), children
 
-to_text= (s)->
+to_text= (s, debug= false)->
   o = []
-  s.eachToken true, (t)->
+  s.eachToken false, (t)->
     o.push switch t.type()
       when 'text' then t.contents()
-      when 'symbol' then "SYM:#{t.name()}:#{to_text t}"
+      when 'symbol'
+        "<SYM:#{t.name()}>"+
+          ("#{ if k is '$$children' then '' else k.toString() + '=>'}#{to_text(ch)}" for k,ch of t.allChildren()).join('') +
+        "</SYM:#{t.name()}>"
       when 'yield' then "YIELD"
       when 'yield:attr' then "YIELD:ATTR:#{t.name()}"
       else "UNKNOWN:#{t}"
+
+    console.log o if debug
   
   o.join(',')
 
@@ -76,11 +82,41 @@ describe 'Symbol', ->
   describe 'yielding', ->
 
     it 'should replace the yield token with the contents when yielding', ->
-      s.push txt_ "<p>"
-      s.push yield_()
-      s.push txt_ "</p>"
+      _pushChildren s, ['<p>',  yield_(), '</p>']
+      res =  to_text( s.yield( [txt_("hello")] ) )
+      expect( res ).toEqual '<p>,hello,</p>'
 
-      expect( to_text( s.yield( [txt_("hello")] ) )).toEqual '<p>,hello,</p>'
+
+    it 'should replace the attribute yields', ->
+      attr_sym = _pushChildren new TokenStream, ['hello', 'world']
+      _pushChildren s, ['<p>', yieldattr_('attr'), yield_(), '</p>']
+
+      res = s.yield( [txt_("!")], attr: attr_sym)
+      expect( to_text(res) ).toEqual '<p>,hello,world,!,</p>'
+      
+
+
+    it 'should replace the nested attribute yields', ->
+      attr_sym = _pushChildren new TokenStream, ['hello', 'world']
+      _pushChildren s, ['<p>',
+        symcall_( 'b', yieldattr_('attr'),'(', yield_(),')'),
+        '</p>'
+      ]
+      res = s.yield( [txt_("!")], attr: attr_sym)
+      expect( to_text(res) ).toEqual '<p>,<SYM:b>hello,world,(,!,)</SYM:b>,</p>'
+
+
+
+    it 'should replace the attribute yields in all children', ->
+      attr_sym = _pushChildren new TokenStream, ['hello', 'world']
+
+      _pushChildren s, ['<p>',
+        symcallparam_( 'b', class:[ yieldattr_('attr') ])
+        '</p>'
+      ]
+      res = s.yield( [txt_("!")], attr: attr_sym)
+      expect( to_text(res) ).toEqual '<p>,<SYM:b>class=>hello,world,(,!,)</SYM:b>,</p>'
+   
 
 
 
@@ -182,9 +218,13 @@ describe 'SymbolTable', ->
         )
 
         st.add( sym_('divlink',
-          symcallparam_('div', class:['a_div'], a_class:['linkage'], href:['/'], target:['_blank'], 'hello' ),
+          symcallparam_('div',
+            class:['a_div'], a_class:['linkage'], href:['/'], target:['_blank'],
+            'hello' )
         ))
-
+        
         expectResolved st, 'divlink',
-          "<div, class=',a_div,',>,<a, ,class,=',linkage,', ,href,=',/,', ,target,=',_blank,',>,hello,</a></div>"
+          "<div, class=',a_div,',>,<a, ,class,=',linkage,', "+
+          ",href,=',/,', ,target,=',_blank,',>,hello,</a></div>"
+
 

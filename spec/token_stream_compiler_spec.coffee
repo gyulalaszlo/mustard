@@ -5,10 +5,14 @@
 tok_ = (type,attrs, hasChildren)->  new Token type, attrs, hasChildren
 text = (txt)-> tok_ 'text', contents:txt
 
-symbol = (name, children) ->
+symbol = (name, children, childChannels={}) ->
   token = tok_ 'symbol', name:name, true
   for c in children
     token.children().push c
+
+  for name, chan of childChannels
+    for c in chan
+      token.children(name).push c
   token
 
 
@@ -63,7 +67,7 @@ describe 'TokenStream', ->
   describe 'stream operations', ->
     gen_presets = -> [
       text("<p>"),
-      symbol('b',[ text('<b>'), text('hello'), text('</b>')] ),
+      symbol('b',[ text('<b>'), text('hello'), text('</b>')], attr:[text('other_channel')] ),
       text("</p>") ]
 
     presets = []
@@ -92,6 +96,11 @@ describe 'TokenStream', ->
         stream.replace 'text', contents:"<b>", [ replace_text ], true
         expect( presets[1].children().tokens()[0] ).toEqual replace_text
 
+      it 'should replace the matching tokens in all child streams', ->
+        stream.replaceRecursive 'text', contents:"other_channel", [ replace_text ]
+        expect( presets[1].children('attr').tokens()[0] ).toEqual replace_text
+
+
       
       describe 'with a yield function', ->
 
@@ -104,6 +113,7 @@ describe 'TokenStream', ->
 
           expect( stream.tokens() ).toEqual [
             replace_text, presets[1], replace_text ]
+
 
 
     describe '#each', ->
