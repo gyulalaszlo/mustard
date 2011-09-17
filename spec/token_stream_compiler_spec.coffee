@@ -47,6 +47,19 @@ describe 'TokenStream', ->
       stream.push token2
       expect( stream.tokens() ).toEqual [ token, token, token, token2 ]
 
+    
+    it 'should push a tokenstream to the stream', ->
+      token = new Token('text', contents:"<p></p>")
+      token2 = new Token('text', contents:"<b></b>")
+      stream.push(token) for i in [0..2]
+      stream.push token2
+
+      stream2 = new TokenStream()
+      stream2.pushStream stream
+
+      expect( stream.tokens() ).toEqual [ token, token, token, token2 ]
+ 
+
   describe 'stream operations', ->
     gen_presets = -> [
       text("<p>"),

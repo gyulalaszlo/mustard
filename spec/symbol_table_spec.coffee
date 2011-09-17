@@ -1,4 +1,4 @@
-{mustard:{Symbol, SymbolTable, TextToken, YieldAttrToken, YieldToken, SymbolCallToken}} = require '../src/symbol_table'
+{mustard:{Symbol, SymbolTable, TextToken, YieldAttrToken, YieldToken, InterpolateToken, AttrScopeToken, SymbolCallToken}} = require '../src/symbol_table'
 
 _pushChildren = (s, children)->
   stream = if s.children then s.children() else s
@@ -13,6 +13,11 @@ yield_ = -> new YieldToken
 yieldattr_ = (name)-> new YieldAttrToken(name)
 txt_ = (txt)-> new TextToken(txt)
 symcall_ = (name, children...)-> _pushChildren new SymbolCallToken(name), children
+
+intp_ = (name)-> new InterpolateToken( name )
+
+attrscope_ = (name, params, children...)->
+  _pushChildren new AttrScopeToken( name, params ), children
 
 symcallparam_ = (name, attributes, children...)->
   sct =  new SymbolCallToken(name)
@@ -149,6 +154,15 @@ describe 'SymbolTable', ->
       
 
 
+    it 'should resolve attribute scopes', ->
+      st.add(
+        sym_('a', "<a",
+          attrscope_('', ['name', 'value'], ' ', intp_('name'), "='", intp_('value'), "'" ),
+          '>', yield_(), '</a>'
+        )
+      )
+      st.add( sym_('link', symcallparam_('a', class:['link'], href:['/'], target:['_blank'], "hello")))
 
-
+      expectResolved st, 'link',
+        "<a, ,class,=',link,', ,href,=',/,', ,target,=',_blank,',>,hello,</a>"
 

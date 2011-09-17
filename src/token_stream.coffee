@@ -53,7 +53,7 @@ class TokenStream
 
 
   push: (token)->
-    throw new Error("Invalid token given: #{token}") unless token instanceof Token
+    throw new Error("Invalid token given: '#{token}'") unless token instanceof Token
     @_tokens.push token
 
   tokens: -> @_tokens
@@ -72,17 +72,24 @@ class TokenStream
       # call with this token
       func(t)
 
-
+  
+  # duplicate the tokens and their children 
   duplicate: ()->
     # create new output stream
     newStream = Object.create( Object.getPrototypeOf(this) )
     newStream.constructor()
     
-    for t in @_tokens
-      newStream.push t.clone()
+    newStream.pushStream this
+    # for t in @_tokens
+    #   newStream.push t.clone()
 
     newStream
 
+
+  pushStream: (tokenStream)->
+    throw new Error("Invalid TokenStream given: '#{tokenStream}'") unless tokenStream instanceof TokenStream
+    for t in tokenStream.tokens()
+      @_tokens.push t.clone()
 
 
   # replace all occurences of a token

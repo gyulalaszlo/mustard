@@ -1,6 +1,8 @@
 {mustard:{Token, TokenStream}} = require './token_stream'
 
 
+
+
 class TextToken extends Token
   constructor: (contents, isInterpolated=false)->
     super 'text', contents: contents, isInterpolated: isInterpolated, false
@@ -18,6 +20,8 @@ class SymbolCallToken extends Token
   _dup: -> new SymbolCallToken @name()
 
 
+
+
 class YieldToken extends Token
   constructor: -> super 'yield', {}, false
   _dup: -> new YieldToken
@@ -30,6 +34,83 @@ class YieldAttrToken extends Token
   name: -> @_attributes.name
   _dup: -> new YieldAttrToken @name()
  
+
+
+
+class InterpolateToken extends Token
+  constructor: (symbolName)->
+    super 'int', name: symbolName, true
+
+  name: -> @_attributes.name
+  _dup: -> new InterpolateToken @name()
+
+
+
+class AttrScopeToken extends Token
+  constructor: (name, parameters=[])->
+    super 'scope:attr', name: name, parameters:parameters, true
+
+  name: -> @_attributes.name
+  parameters: -> @_attributes.parameters
+
+  _dup: -> new AttrScopeToken @name(), @parameters()
+
+  resolve: (attributes)->
+    # get the object open by the scope 
+    obj = if @name() is '' then attributes else attributes[@name()]
+    
+    # no such attribute? return an empty token stream
+    return [] unless obj
+
+    params = @parameters()
+
+    # If no parameters given, just return the child tokens.
+    if params.length == 0
+      return @children().duplicate()
+
+    # Two params? iterate!
+    if params.length == 2
+
+      # create a new tokenstream for the output
+      out = new TokenStream
+
+      # iterate over the attributes given
+      for attr_name, attribute of obj
+        # skip the $$content attribute that's used for
+        # 
+        continue if attr_name is Token.children
+
+        # console.log "A: #{attr_name} '#{@name()}' resolve:", attribute,
+          # Object.getPrototypeOf(attribute)
+
+        @children().eachToken true, (t)->
+
+          # replace interpolation instances
+          if t.type() is 'int'
+
+            # add the key 
+            if t.name() is params[0]
+              out.push new TextToken( attr_name )
+              return
+
+            # add the children stream
+            if t.name() is params[1]
+              console.log "attibute strteam:", attribute
+              out.pushStream attribute
+              return
+
+
+          # if not interpolated, add this
+          out.push t.clone()
+
+      return out
+    
+      
+
+
+
+
+
 
 
 
@@ -64,6 +145,8 @@ class Symbol extends TokenStream
     for name, children of attributesTokens
       out_tokens.replaceRecursive 'yield:attr', {name: name}, children
       
+    out_tokens.replaceRecursive 'scope:attr', {}, (t)->
+      t.resolve attributesTokens
 
     out_tokens
 
@@ -114,7 +197,8 @@ class SymbolTable
       symbol.replaceRecursive 'symbol', {name: depName}, (t)->
         dependency.yield( t.children().tokens(), t.childrenHash() ).tokens()
         # dependency.tokens()
-
+        #
+      
       # do we have any more dependencies?
       hasDependencies = dependencies.length > 0
 
@@ -133,4 +217,6 @@ root.mustard.SymbolTable = SymbolTable
 root.mustard.TextToken = TextToken
 root.mustard.YieldToken = YieldToken
 root.mustard.YieldAttrToken = YieldAttrToken
+root.mustard.InterpolateToken = InterpolateToken
+root.mustard.AttrScopeToken = AttrScopeToken
 root.mustard.SymbolCallToken = SymbolCallToken
