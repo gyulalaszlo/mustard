@@ -46,10 +46,8 @@ describe 'TokenStream', ->
       stream.push(token) for i in [0..2]
       stream.push token2
       expect( stream.tokens() ).toEqual [ token, token, token, token2 ]
-      
-  
-  describe '#replace', ->
 
+  describe 'stream operations', ->
     gen_presets = -> [
       text("<p>"),
       symbol('b',[ text('<b>'), text('hello'), text('</b>')] ),
@@ -62,31 +60,88 @@ describe 'TokenStream', ->
       presets = gen_presets()
       stream.push(t ) for t in presets
 
-
-    it 'should replace all tokens in the stream if no filter object is given', ->
-      stream.replace 'text', null, [ replace_text ]
-      expect( stream.tokens() ).toEqual [
-        replace_text, presets[1], replace_text ]
-      
-    it 'should replace the matching tokens in the stream', ->
-      stream.replace 'text', contents:"<p>", [ replace_text ]
-      expect( stream.tokens() ).toEqual [
-        replace_text, presets[1], presets[2]]
+  
+    describe '#replace', ->
 
 
-    it 'should replace the matching children tokens in the stream', ->
-      stream.replace 'text', contents:"<b>", [ replace_text ], true
-      expect( presets[1].children().tokens()[0] ).toEqual replace_text
-
-    
-    describe 'with a yield function', ->
-
-      it 'should call the block with the tokens for each occurance', ->
-        idx = 0
-        stream.replace 'text', null, (token)->
-          expect( token ).toEqual presets[idx] unless idx is 1
-          idx++
-          replace_text
-
+      it 'should replace all tokens in the stream if no filter object is given', ->
+        stream.replace 'text', null, [ replace_text ]
         expect( stream.tokens() ).toEqual [
           replace_text, presets[1], replace_text ]
+        
+      it 'should replace the matching tokens in the stream', ->
+        stream.replace 'text', contents:"<p>", [ replace_text ]
+        expect( stream.tokens() ).toEqual [
+          replace_text, presets[1], presets[2]]
+
+
+      it 'should replace the matching children tokens in the stream', ->
+        stream.replace 'text', contents:"<b>", [ replace_text ], true
+        expect( presets[1].children().tokens()[0] ).toEqual replace_text
+
+      
+      describe 'with a yield function', ->
+
+        it 'should call the block with the tokens for each occurance', ->
+          idx = 0
+          stream.replace 'text', null, (token)->
+            expect( token ).toEqual presets[idx] unless idx is 1
+            idx++
+            replace_text
+
+          expect( stream.tokens() ).toEqual [
+            replace_text, presets[1], replace_text ]
+
+
+    describe '#each', ->
+
+      it 'should iterate over the list of the stream', ->
+        idx = 0
+        found_p = false
+        stream.eachToken (t)->
+          expect( t instanceof Token).toEqual true
+          found_p = true if t is presets[1]
+          idx++
+
+        expect(idx).toEqual 3
+        expect(found_p).toEqual true
+
+      it 'should iterate over the list of the stream recursively', ->
+        idx = 0
+        found_hello = false
+        stream.eachToken true, (t)->
+          expect( t instanceof Token).toEqual true
+          found_hello = true if t.attributes().contents is 'hello'
+          idx++
+
+        expect(idx).toEqual 6
+        expect(found_hello).toEqual true
+
+
+
+    describe '#duplicate', ->
+        
+      it 'should duplicate the contents of the stream', ->
+        duped = stream.duplicate()
+        expect( duped.tokens() ).not.toEqual duped.tokens
+        
+        test = []; tokens = []
+        stream.eachToken true, (t)->
+          o = {}
+          o[k] = t[k]() for k in ['type', 'attributes']
+          tokens.push t
+          test.push o
+        
+        idx = 0
+        duped.eachToken true, (t)->
+          exp = test[idx]
+          for k in ['type', 'attributes']
+            expect( t[k]() ).toEqual( exp[k] )
+
+          expect( tokens[idx] ).not.toBe( t )
+          idx++
+
+        expect(idx).toEqual( test.length )
+
+          
+

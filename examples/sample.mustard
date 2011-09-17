@@ -1,0 +1,240 @@
+// Line comments start with a double slash
+
+
+// strings are quoted
+"Hello world" // => Hello world
+
+// symbols are used like
+// <symbol> <contents>
+p "Hello world" // => Hello world!
+
+// or <symbol> <contents>, <contents>, ..., <contents>
+p "Hello", " ", "world", "!" // => Hello world!
+
+// or <symbol> { <contents> <....> }
+// or <symbol> ( <contents> <....> )
+// or <symbol> : <contents> <....> ;
+div { h1 "Hello" p "Lorem ipsum..." }
+
+// Mustard is whitespace insensitive:
+p "Hello world" p "hi" 
+
+
+
+// Declare a symbol for p and use it
+p = { "<p>" {{yield}}  "</p>" }
+p "Hello world" // => <p>Hello world</p>
+
+
+
+
+// Interpolation
+// =============
+
+// interpolate a value from the context:
+{{ name }}
+
+// or the short form
+:name
+
+// access a property of an object
+{{ user.name }}
+:user.name // 
+
+
+
+// Scopes
+// ======
+
+// Blocks proved lexical scopes, conditional evaluation and
+// iteration with a common syntax:
+
+{{ open_this_object }} ->  {  "Block contents" }    // no parameters
+{{ open_this_object }} -> {{one parameter}}  {  "Block contents" }
+{{ open_this_object }} -> {{two}} {{parameters}}  {  "Block contents" }
+
+// or the simple form
+
+
+:open_this_object ->  {  "Block contents" }    // no parameters
+:open_this_object -> :one_parameter  {  "Block contents" }
+:open_this_object -> :two :parameters  {  "Block contents" }
+
+
+// One parameter
+// -----------------
+
+// When the scope is opened from any object:
+//
+// a scope with a single parameter aliases the given
+// object with the new key in the context (think of it as
+// a new temporary variable. 
+:userPrivileges -> :u { td :u.name  td :u.rights  td :u.mask }
+
+
+
+
+
+// One parameter
+// -----------------
+
+// When the scope is opened from an object:
+//
+// a scope with a single parameter aliases the given
+// object with the new key in the context (think of it as
+// a new temporary variable. 
+:userPrivileges -> :u { td :u.name  td :u.rights  td :u.mask }
+
+
+// When the scope is opened from an Array:
+//
+// a scope with a single parameter iterates the given
+// parameter over the array (think of it as for loop)
+:users -> :user { b :user.name }
+
+
+
+
+// Two parameters
+// -----------------
+
+// When the scope is opened from an object:
+//
+// a scope with two parameters iterates over the keys and
+// values of the opened object.
+:attributes ->  :key :value { label :key input :value }
+
+// When the scope is opened from an Array:
+//
+// a scope with a single parameter iterates the given
+// parameter over the array (think of it as for loop),
+// and supplies the index of the current element.
+:users -> :index :user { "#" i index " - " b :user.name }
+
+
+
+
+// Attributes
+// ==========
+
+// Basic attribute
+p = { "<p class={{ @class }}>" :yield "</p>" }
+p@class="bold"  // => <p class="bold"></p>
+
+// Check for existance before printing:
+p = { "<p" :@class -> { " class='{{ @class }}'" } ">" :yield "</p>"
+
+// Or mass-print'em
+p = { "<p" :@ -> :name :value { " {{name}}='{{ value }}'" } ">" :yield "</p>"
+
+
+// Shortcuts:
+
+// haml-like
+p.a_class.other_class#the_id
+
+// is the equivalent of writing
+p @class="a_class" @class="other_class" @id="the_id"
+
+// and since attributes with the same name are concatenated,
+// the same as
+p @class="a_class other_class" @id="the_id"
+
+// and the shortcut for @data-<something> is $something
+div$role="scroll" 
+
+// is equivalent to
+div @data-role="scroll"
+
+
+// When the attributes are used on their own (without a symbol name)
+// the fallback symbol in instantiated. The default for the HTML5
+// grammar is "div".
+
+.element#element_12 "Element contents"
+// is the same as
+div.element#element_12 "Element contents"
+
+
+// This fallback symbol can be set by the [fallbackSymbol <symbolname>]
+// pragma directive
+
+// if we change the fallback:
+[fallbackSymbol section]
+
+.element#element_12 "Element contents"
+// is now the same as
+section.element#element_12 "Element contents"
+
+
+
+
+
+
+
+
+
+
+// Filters
+// =======
+
+
+// Filters allow the construction of unix pipe-like filter
+// pipelines when working with interpolation data.
+// Some examples:
+
+p.max_rating {{ ratings | max }}
+
+{{ source | lines }} -> :lineno :line { td.lineno :linenoe td.line :line }
+
+ul.unlikely_candidates {{ users | filter 'age < 5' }} -> :user { li :user }
+
+
+
+// Wrapping
+// ========
+
+// The output of any symbol can be wrapped:
+// the wrapper wraps the target symbol for all calls of
+// that symbol.
+
+// from insde the symbol:
+// this wrapping is always in place
+
+// a pretty useless example
+codesample = {
+  // ... contents ...
+  
+  <- -> {  
+    div.sample { :yield }
+    code { {{ yield | escape }} }
+  }
+}
+
+
+// A more useful example with scoping:
+// When wrapping another element, the wrapping is scoped to the current
+// symbol context.
+
+ul.inputs {
+  <- input, label -> { li :yield }
+
+  label @for="name" "Name"  input @name="name"
+  label @for="name" "Password"  input @name="passwrod" @type="password" 
+}
+
+
+
+
+// Pragmas
+// =======
+
+
+// Pragma directives affect the compilation
+// pragmas must be inside square brackets and affect
+// various parts of the compilation
+
+
+[require "html5"]
+p = { "<p>" yield "</p>" }
+
