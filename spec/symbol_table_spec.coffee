@@ -10,6 +10,7 @@ _pushChildren = (s, children)->
   return s
 
 yield_ = -> new YieldToken
+yieldattr_ = (name)-> new YieldAttrToken(name)
 txt_ = (txt)-> new TextToken(txt)
 symcall_ = (name, children...)-> _pushChildren new SymbolCallToken(name), children
 sym_ = (name, children...)-> _pushChildren new Symbol(name), children
@@ -21,6 +22,7 @@ to_text= (s)->
       when 'text' then t.contents()
       when 'symbol' then "SYM:#{t.name}:#{to_text t}"
       when 'yield' then "YIELD"
+      when 'yield:attr' then "YIELD:ATTR:#{t.name()}"
   
   o.join(',')
 
@@ -115,7 +117,10 @@ describe 'SymbolTable', ->
 
 
     it 'should resolve attribute yields', ->
-      
+      st.add sym_( 'a', "<a href='", yieldattr_('href'), "'>", yield_(), "</a>" )
+      st.add sym_( 'link', symcall_('a'))
+
+      expectResolved st, 'link', "<a href=',YIELD:ATTR:href,'>,YIELD,</a>"
 
 
 

@@ -23,6 +23,14 @@ class YieldToken extends Token
   _dup: -> new YieldToken
  
 
+class YieldAttrToken extends Token
+  constructor: (attrName)-> super 'yield:attr', name:attrName, false
+  name: -> @_attributes.name
+  _dup: -> new YieldAttrToken
+ 
+
+
+
 
 class Symbol extends TokenStream
   constructor: (@_name)->
@@ -115,4 +123,5 @@ root.mustard.Symbol = Symbol
 root.mustard.SymbolTable = SymbolTable
 root.mustard.TextToken = TextToken
 root.mustard.YieldToken = YieldToken
+root.mustard.YieldAttrToken = YieldAttrToken
 root.mustard.SymbolCallToken = SymbolCallToken
