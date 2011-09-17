@@ -111,7 +111,7 @@ describe 'Symbol', ->
       attr_sym = _pushChildren new TokenStream, ['hello', 'world']
 
       _pushChildren s, ['<p>',
-        symcallparam_( 'b', class:[ yieldattr_('attr') ])
+        symcallparam_( 'b', class:[ yieldattr_('attr'), '(', yield_(), ')' ])
         '</p>'
       ]
       res = s.yield( [txt_("!")], attr: attr_sym)
@@ -195,14 +195,19 @@ describe 'SymbolTable', ->
       beforeEach ->
         st.add(
           sym_('a', "<a",
-            attrscope_('', ['name', 'value'], ' ', intp_('name'), "='", intp_('value'), "'" ),
+            attrscope_('@', ['name', 'value'], ' ', intp_('name'), "='", intp_('value'), "'" ),
             '>', yield_(), '</a>'
           )
         )
  
 
       it 'should resolve attribute scopes', ->
-        st.add( sym_('link', symcallparam_('a', class:['link'], href:['/'], target:['_blank'], "hello")))
+        st.add( sym_('link',
+          symcallparam_('a',
+            class:['link'], href:['/'], target:['_blank'],
+            "hello" )
+          )
+        )
         expectResolved st, 'link',
           "<a, ,class,=',link,', ,href,=',/,', ,target,=',_blank,',>,hello,</a>"
     
@@ -212,19 +217,23 @@ describe 'SymbolTable', ->
           sym_('div', "<div",
             attrscope_('class', [], " class='", yieldattr_('class'), "'" ),
             '>',
-            symcallparam_( 'a', class:[ yieldattr_('a_class') ])
+            symcallparam_( 'a',
+              class:[ yieldattr_('a_class') ],
+              href:['/'], target:['_blank'],
+              yield_()
+            )
             yield_(), '</div>'
           )
         )
 
         st.add( sym_('divlink',
           symcallparam_('div',
-            class:['a_div'], a_class:['linkage'], href:['/'], target:['_blank'],
+            class:['a_div'], a_class:['linkage'],
             'hello' )
         ))
         
         expectResolved st, 'divlink',
           "<div, class=',a_div,',>,<a, ,class,=',linkage,', "+
-          ",href,=',/,', ,target,=',_blank,',>,hello,</a></div>"
+          ",href,=',/,', ,target,=',_blank,',>,hello,</a>,hello,</div>"
 
 

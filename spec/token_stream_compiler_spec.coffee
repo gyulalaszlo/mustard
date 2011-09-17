@@ -109,7 +109,7 @@ describe 'TokenStream', ->
           stream.replace 'text', null, (token)->
             expect( token ).toEqual presets[idx] unless idx is 1
             idx++
-            replace_text
+            [replace_text]
 
           expect( stream.tokens() ).toEqual [
             replace_text, presets[1], replace_text ]

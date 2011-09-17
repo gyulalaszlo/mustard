@@ -60,8 +60,10 @@ class AttrScopeToken extends Token
 
   resolve: (attributes)->
     # get the object open by the scope 
-    obj = if @name() is '' then attributes else attributes[@name()]
+    obj = if @name() is '@' then attributes else attributes[@name()]
     
+    console.log "----> Resolving: #{obj} -- #{ JSON.stringify obj, null, 2}" if Symbol.debug
+
     # no such attribute? return an empty token stream
     return [] unless obj
 
@@ -142,20 +144,18 @@ class Symbol extends TokenStream
 
   yield: (innerTokens, attributesTokens={})->
     out_tokens = @duplicate()
-    out_tokens.replaceRecursive 'yield', {}, (t)->
-      innerTokens
+    out_tokens.replaceRecursive 'yield', {}, innerTokens
 
     out_tokens.replaceRecursive 'scope:attr', {}, (t)->
-      t.resolve attributesTokens
+      console.log "Found scope:attr token:#{t}" if Symbol.debug
+      tokens = t.resolve attributesTokens
+      console.log "Resolved to: #{tokens}" if Symbol.debug
+      tokens
 
     for name, children of attributesTokens
-      # console.log("Looking for match for: #{name} in #{}" )if Symbol.debug
       out_tokens.replaceRecursive 'yield:attr', {name: name}, (t)->
-        # console.log("Found match: #{name} -- #{t}") if Symbol.debug
+        # console.log "Found yield:attr: name:#{name} token:#{t}" if Symbol.debug
         children
-
-    
-      
 
     out_tokens
 

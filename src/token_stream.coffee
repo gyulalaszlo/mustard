@@ -155,6 +155,8 @@ class TokenStream
 
 
 validateTokenList = (tokenarr)->
+  unless tokenarr instanceof Array or tokenarr instanceof TokenStream
+    throw new Error("Invalid token list given: #{tokenarr}")
   for token in tokenarr
     throw new Error("Invalid token given: #{token}") unless token instanceof Token
 
