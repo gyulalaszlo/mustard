@@ -236,4 +236,8 @@ describe 'SymbolTable', ->
           "<div, class=',a_div,',>,<a, ,class,=',linkage,', "+
           ",href,=',/,', ,target,=',_blank,',>,hello,</a>,hello,</div>"
 
+        
+        # expectResolved st, 'div',
+        #   "<div,"
+
 
