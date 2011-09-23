@@ -33,12 +33,10 @@ class TokenStream
     newStream.constructor()
     
     newStream.pushStream this
-    # for t in @_tokens
-    #   newStream.push t.clone()
-
     newStream
 
 
+  # Clone each element in __tokenStream__ stream into this stream
   pushStream: (tokenStream)->
     throw new Error("Invalid TokenStream given: '#{tokenStream}'") unless tokenStream instanceof TokenStream
     for t in tokenStream.tokens()

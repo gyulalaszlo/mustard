@@ -1,4 +1,3 @@
-# {mustard:{TokenStream}} = require './token_stream'
 
 class Token
   @children = '$$children'
