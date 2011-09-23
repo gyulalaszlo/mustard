@@ -1,5 +1,6 @@
 {mustard:{TextToken, YieldAttrToken, YieldToken, InterpolateToken, AttrScopeToken, SymbolCallToken}} = require '../src/token_types'
-{mustard:{Symbol, SymbolTable}} = require '../src/symbol_table'
+{mustard:{Symbol}} = require '../src/symbol'
+{mustard:{SymbolTable}} = require '../src/symbol_table'
 {mustard:{TokenStream}} = require '../src/token_stream'
 
 _pushChildren = (s, children)->

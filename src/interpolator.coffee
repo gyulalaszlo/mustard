@@ -6,7 +6,7 @@ class Interpolator
     while token = reader.read()
       switch token.type()
         when 'text' then @pushString token.contents()
-        when 'int'  then @pushInterpolate token.contents()
+        when 'int'  then @pushInterpolate token.name()
         else throw new Error("Unknown token type in interpolator: #{token.type()}")
 
     @flushBuffer()

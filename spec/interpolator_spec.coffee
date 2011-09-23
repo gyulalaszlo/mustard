@@ -1,14 +1,10 @@
 {mustard:{Token}} = require '../src/token'
+{mustard:{TextToken, YieldAttrToken, YieldToken, InterpolateToken, AttrScopeToken, SymbolCallToken}} = require '../src/token_types'
 {mustard:{Interpolator}} = require '../src/interpolator'
 
-class MockToken
-  constructor: (@_type, @_attributes)->
-  type: -> @_type
-  contents: -> @_attributes.contents
-  attributes: -> @_attributes
 
-txt = (content)-> new Token 'text', contents: content
-int = (val)-> new Token 'int', contents: val
+txt = (content)-> new TextToken content
+int = (val)-> new InterpolateToken val
 # scope = (source, params, children)-> new MockToken 'scope', contents: val
 
 class MockStreamReader
