@@ -1,12 +1,15 @@
+{mustard:{Token}} = require '../src/token'
 {mustard:{Interpolator}} = require '../src/interpolator'
 
 class MockToken
   constructor: (@_type, @_attributes)->
   type: -> @_type
   contents: -> @_attributes.contents
+  attributes: -> @_attributes
 
-txt = (content)-> new MockToken 'text', contents: content
-int = (val)-> new MockToken 'int', contents: val
+txt = (content)-> new Token 'text', contents: content
+int = (val)-> new Token 'int', contents: val
+# scope = (source, params, children)-> new MockToken 'scope', contents: val
 
 class MockStreamReader
   constructor: (tokens...)->
@@ -52,4 +55,6 @@ describe 'Interpolator', ->
     reader = new MockStreamReader '<p', '>', 'hello ', int('world'), '</p>'
     output = interpolator.linearize_stream reader
     expect(output).toEqual ['<p>hello ', {type:'int', contents:'world' } ,'</p>']
-
+  
+  # it 'should ', ->
+    # reader = new MockStreamReader scope('foo', ['bar', 'baz'], 

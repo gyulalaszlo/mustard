@@ -1,4 +1,5 @@
-{mustard:{Token, TokenStream}} = require '../src/token_stream'
+{mustard:{Token}} = require '../src/token'
+{mustard:{TokenStream}} = require '../src/token_stream'
 
 # console.log mustard
 #

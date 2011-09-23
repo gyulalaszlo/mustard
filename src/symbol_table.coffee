@@ -1,4 +1,5 @@
-{mustard:{Token, TokenStream}} = require './token_stream'
+{mustard:{Token}} = require './token'
+{mustard:{TokenStream}} = require './token_stream'
 
 
 
