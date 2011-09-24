@@ -46,6 +46,19 @@ class InterpolateToken extends Token
 
 
 
+class ScopeToken extends Token
+  constructor: (name, parameters=[])->
+    super 'scope', name: name, parameters:parameters, true
+
+  name: -> @_attributes.name
+  parameters: -> @_attributes.parameters
+
+  _dup: -> new ScopeToken @name(), @parameters()
+
+
+
+
+
 class AttrScopeToken extends Token
   constructor: (name, parameters=[])->
     super 'scope:attr', name: name, parameters:parameters, true
@@ -114,6 +127,7 @@ class AttrScopeToken extends Token
 root = exports ? this
 root.mustard or= {}
 root.mustard.TextToken = TextToken
+root.mustard.ScopeToken = ScopeToken
 root.mustard.YieldToken = YieldToken
 root.mustard.YieldAttrToken = YieldAttrToken
 root.mustard.InterpolateToken = InterpolateToken

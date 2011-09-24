@@ -3,51 +3,7 @@
 {mustard:{SymbolTable}} = require '../src/symbol_table'
 {mustard:{TokenStream}} = require '../src/token_stream'
 
-_pushChildren = (s, children)->
-  stream = if s.children then s.children() else s
-  for c in children
-    c = [c] unless c instanceof Array
-    for child in c
-      child = txt_(child) if typeof child is 'string'
-      stream.push(child)
-  return s
-
-yield_ = -> new YieldToken
-yieldattr_ = (name)-> new YieldAttrToken(name)
-txt_ = (txt)-> new TextToken(txt)
-symcall_ = (name, children...)-> _pushChildren new SymbolCallToken(name), children
-
-intp_ = (name)-> new InterpolateToken( name )
-
-attrscope_ = (name, params, children...)->
-  _pushChildren new AttrScopeToken( name, params ), children
-
-symcallparam_ = (name, attributes, children...)->
-  sct =  new SymbolCallToken(name)
-  _pushChildren sct, children
-  for k, v of attributes
-    _pushChildren sct.children(k), v
-  sct
-
-sym_ = (name, children...)-> _pushChildren new Symbol(name), children
-
-to_text= (s, debug= false)->
-  o = []
-  s.eachToken false, (t)->
-    o.push switch t.type()
-      when 'text' then t.contents()
-      when 'symbol'
-        "<SYM:#{t.name()}>"+
-          ("#{ if k is '$$children' then '' else k.toString() + '=>'}#{to_text(ch)}" for k,ch of t.allChildren()).join('') +
-        "</SYM:#{t.name()}>"
-      when 'yield' then "YIELD"
-      when 'yield:attr' then "YIELD:ATTR:#{t.name()}"
-      else "UNKNOWN:#{t}"
-
-    console.log o if debug
-  
-  o.join(',')
-
+{yield_, yieldattr_, symcall_, intp_, attrscope_, symcallparam_, sym_, to_text} = require './spec_helper'
 
 expectResolved = (symbol_table, symbol_name, result)->
   expect( to_text( symbol_table.resolved(symbol_name))).

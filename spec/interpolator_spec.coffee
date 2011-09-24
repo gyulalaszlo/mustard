@@ -1,11 +1,11 @@
-{mustard:{Token}} = require '../src/token'
-{mustard:{TextToken, YieldAttrToken, YieldToken, InterpolateToken, AttrScopeToken, SymbolCallToken}} = require '../src/token_types'
+{mustard:{Token}} = require '../src/token_stream'
 {mustard:{Interpolator}} = require '../src/interpolator'
+{mustard:{TokenStream}} = require '../src/token_stream'
 
+{yield_, yieldattr_, scope, _stream, symcall_, intp_, attrscope_, symcallparam_, sym_, to_text} = require './spec_helper'
 
-txt = (content)-> new TextToken content
-int = (val)-> new InterpolateToken val
-# scope = (source, params, children)-> new MockToken 'scope', contents: val
+# txt = (content)-> new TextToken content
+# int = (val)-> new InterpolateToken val
 
 class MockStreamReader
   constructor: (tokens...)->
@@ -25,9 +25,13 @@ class MockStreamReader
 
   addTokens: (tokens...)->
     for t in tokens
-      t = txt(t) if typeof t == 'string'
+      t = txt_(t) if typeof t == 'string'
       # console.log t
       @tokens.push t
+
+
+expect_to_text = (stream,expectation)->
+  expect( to_text( stream )).toEqual expectation
 
 
 describe 'Interpolator', ->
@@ -42,15 +46,20 @@ describe 'Interpolator', ->
 
 
   it 'should produce a concatendated string', ->
-    reader = new MockStreamReader '<p', '>', 'hello ', 'world', '</p>'
+    reader = stream '<p', '>', 'hello ', 'world', '</p>'
     output = interpolator.linearize_stream reader
-    expect(output).toEqual ['<p>hello world</p>']
+    expect_to_text output, '<p>hello world</p>'
 
 
   it 'should produce an output list of tokens for interpolation', ->
-    reader = new MockStreamReader '<p', '>', 'hello ', int('world'), '</p>'
+    interp = intp_('world')
+    reader = stream '<p', '>', 'hello ', interp, '</p>'
     output = interpolator.linearize_stream reader
-    expect(output).toEqual ['<p>hello ', {type:'int', contents:'world' } ,'</p>']
+    expect_to_text output, '<p>hello ,INT:world,</p>'
   
-  # it 'should ', ->
-    # reader = new MockStreamReader scope('foo', ['bar', 'baz'], 
+  it 'should ', ->
+    scopet = scope 'foo', ['bar', 'baz'], '<p', '>', intp_('baz'), '<','/p>'
+    reader = stream '<b', '>', scopet, '</', 'b>'
+
+    output = interpolator.linearize_stream reader
+    expect_to_text output, '  '
